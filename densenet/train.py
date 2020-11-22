@@ -10,6 +10,8 @@ from torchvision import datasets, models, transforms
 import time
 import os
 import copy
+from densenet.dataset import dataloader
+from densenet.preprocess import preproc
 
 data_transforms = {
     'train': transforms.Compose([
@@ -26,7 +28,11 @@ data_transforms = {
     ]),
 }
 
-data_dir = '../data/'
+training_dataset = '../data/'
+
+dataset = dataloader(training_dataset, preproc())
+
+
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val']}
