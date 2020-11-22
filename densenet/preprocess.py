@@ -23,9 +23,9 @@ def _distort(image):
 
     val = random.randint(-5, 5)
     
-    image_t = np.array(image).T 
-    image_t[idx_list]+=val
-    image = image_t.T
+    image_t = image.transpose(1,0,2)
+    image_t[idx_list]+=np.uint8(val)
+    image = image_t.transpose(1,0,2)
     return image
 
 
@@ -44,16 +44,14 @@ def _rotate(image):
 class preproc(object):
 
     def __init__(self):
-        pass 
+        self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
     
     def __call__(self, image, targets):
-
-        labels = targets[:, -1].copy()
-#         print(labels.shape)
+        labels = self.labels_names.index(targets)
         image_t = _random_crop(image)
-        image_t = _distort(image_t)
-        image_t = _mirror(image_t)
+        if bool(random.getrandbits(1)):
+            image_t = _distort(image_t)
+        if bool(random.getrandbits(1)):
+            image_t = _mirror(image_t)
 
-        labels_t = np.expand_dims(labels, 1)
-
-        return image_t, labels_t
+        return image_t, labels

@@ -12,6 +12,7 @@ class dataloader(data.Dataset):
         self.preproc = preproc
         self.imgs_path = []
         self.labels = []
+        self.weights = []
         df = pd.read_csv(txt_path)
         img_list = list(df['image'])
         for i in img_list:
@@ -23,15 +24,9 @@ class dataloader(data.Dataset):
         return len(self.imgs_path)
 
     def __getitem__(self, index):
-#         import pdb;pdb.set_trace()
-        
         img = cv2.imread(self.imgs_path[index])
 
         label = self.labels[index]
-        target = np.array(label)
         if self.preproc is not None:
-#             print(self.flags[index])
-            img, target = self.preproc(img, target)
-
-        # return torch.from_numpy(img), target
+            img, target = self.preproc(img, label)
         return torch.unsqueeze(torch.from_numpy(img), 0), target 
