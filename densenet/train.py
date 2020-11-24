@@ -1,8 +1,11 @@
 from __future__ import division, print_function
 
 import copy
+import os
 import time
+from datetime import datetime
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,32 +14,46 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset import dataloader
-from preprocess import preproc
 from densenet import densenet121
-
-
-# default `log_dir` is "runs" - we'll be more specific here
-writer = SummaryWriter('runs/densenet_crossentropy_weighted_auto')
-
+from preprocess import preproc
 
 training_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
 training_data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, training_data, preproc(), True, 0.1)
-validation = dataloader(training_csv, training_data, preproc(), False, 0.1)
+training = dataloader(training_csv, training_data, preproc(), True, 0.8)
+validation = dataloader(training_csv, training_data, preproc(), False, 0.2)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 dataloaders = {'train': training, 'val': validation}
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
-    since = time.time()
+def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
+    # training visualizing
+    if epoch == 0 and step == 0:
+        writer.add_scalar(f'{phase} loss', epoch_loss, 0)
+        writer.add_scalar(f'{phase} accuracy', 0, 0)
+    ######################
+    else:
+        writer.add_scalar(f'{phase} loss',
+                          epoch_loss,
+                          epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
+        print(f'{phase} loss  ', str(
+            epoch * len(dataloaders[phase]) + len(dataloaders[phase])))
 
+        writer.add_scalar(f'{phase} accuracy',
+                          epoch_acc,
+                          epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
+    ######################
+
+
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, num_epochs=25):
+
+    since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
-    batch_size = 10
+    lowest_val_loss = 10.0
+
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
@@ -50,11 +67,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             if phase == 'train':
                 model.train()  # Set model to training mode
                 # Iterate over data.
-                batch_iterator = iter(DataLoader(dataloaders[phase], batch_size, shuffle=True, num_workers=4))
+                batch_iterator = iter(DataLoader(
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=4))
             else:
                 model.eval()   # Set model to evaluate mode
-                batch_iterator = iter(DataLoader(dataloaders[phase], batch_size, shuffle=True, num_workers=4))
-            
+                batch_iterator = iter(DataLoader(
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=4))
+
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
             for step in range(iteration):
@@ -74,11 +93,9 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     loss = criterion(outputs, labels)
 
                     # training visualizing
-                    if epoch==0 and step==0:
+                    if epoch == 0 and step == 0:
                         writer.add_graph(model, images[0].unsqueeze(0))
-                        writer.add_scalar(f'{phase} loss', loss, 0)
-                        print(f'{phase} loss   0000000000 epoch {epoch}')
-                        writer.add_scalar(f'{phase} accuracy', 0, 0)
+                        visualizing(phase, epoch, step, loss, 0)
                     ######################
 
                     # backward + optimize only if in training phase
@@ -87,50 +104,45 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                         optimizer.step()
 
                 # statistics
-                if phase=='train':
+                if phase == 'train':
                     train_loss += loss.item() * images.size(0)
                     train_correct += torch.sum(preds == labels.data)
-                    # print(f'epoch {epoch} - step {step}/{iteration} - TrainingLoss {loss}')
+                    print(f'epoch {epoch} - step {step}/{iteration} - TrainingLoss {loss}')
                 else:
                     val_loss += loss.item() * images.size(0)
                     val_correct += torch.sum(preds == labels.data)
-                    # print(f'epoch {epoch} - step {step}/{iteration} - ValidateLoss {loss}')
+                    print(f'epoch {epoch} - step {step}/{iteration} - ValidateLoss {loss}')
 
             if phase == 'train':
                 scheduler.step()
-            if phase=='train':
+            if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])
                 epoch_acc = val_correct.double() / len(dataloaders[phase])
-                
-            # training visualizing
-                
-            writer.add_scalar(f'{phase} loss',
-                            epoch_loss,
-                            epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
-            print(f'{phase} loss  ', str(epoch * len(dataloaders[phase]) + len(dataloaders[phase])))
 
-            writer.add_scalar(f'{phase} accuracy',
-                            epoch_acc,
-                            epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
-            
+            # training visualizing
+            visualizing(phase, epoch, step, epoch_loss, epoch_acc)
             ######################
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
 
             # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
+            if phase == 'val' and epoch_loss < lowest_val_loss:
+                lowest_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
-
+        
+        # save weight every epoch
+        torch.save(model.state_dict(), f'./weights/state_{model_name}.pth')
+        # save full model every epoch
+        torch.save(model, f'./weights/full_{model_name}.pth')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
-        print('Best val Acc: {:4f}'.format(best_acc))
+        print('Best val Loss: {:4f}'.format(lowest_val_loss))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -138,8 +150,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
 
 if __name__ == "__main__":
-    model_ft = densenet121(pretrained=False)
+    # default `log_dir` is "runs" - we'll be more specific here
+    writer = SummaryWriter('runs/densenet_crossentropy_weighted_auto')
 
+    now = datetime.now()
+    model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
+
+    model_ft = densenet121(pretrained=False)
     model_ft = model_ft.to(device)
 
     criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
@@ -148,7 +165,8 @@ if __name__ == "__main__":
     optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
     # Decay LR by a factor of 0.1 every 7 epochs
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    exp_lr_scheduler = lr_scheduler.StepLR(
+        optimizer_ft, step_size=7, gamma=0.1)
 
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                        num_epochs=50)
+    model_ft = train_model(model_ft, criterion, optimizer_ft,
+                           exp_lr_scheduler, writer, model_name, batch_size=12, num_epochs=50)
