@@ -23,8 +23,8 @@ training_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Tr
 training_data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, training_data, preproc(), True, 0.8)
-validation = dataloader(training_csv, training_data, preproc(), False, 0.2)
+training = dataloader(training_csv, training_data, preproc(), True, 0.01)
+validation = dataloader(training_csv, training_data, preproc(), False, 0.01)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -49,16 +49,18 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 batch_iterator = iter(DataLoader(dataloaders[phase], batch_size, shuffle=True, num_workers=0))
             else:
                 model.eval()   # Set model to evaluate mode
-                batch_iterator = iter(DataLoader(dataloaders[phase], batch_size, shuffle=True, num_workers=0))
+                batch_iterator = iter(DataLoader(dataloaders[phase], batch_size, shuffle=True, num_workers=4))
 
             running_loss = 0.0
             running_corrects = 0
 
             
             # for images, labels in dataloaders[phase]:
-            for iteration in range(int(len(dataloaders[phase])/batch_size)):
+            iteration = int(len(dataloaders[phase])/batch_size)
+            for step in range(iteration):
                 images, labels = next(batch_iterator)
                 images = images.to(device)
+                labels = labels.squeeze(1)
                 labels = labels.to(device)
                 
                 writer.add_graph(model, images)
@@ -82,6 +84,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 # statistics
                 running_loss += loss.item() * images.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+                print(f'epoch {epoch} - step {step}/{iteration} - TrainingLoss {loss}')
             if phase == 'train':
                 scheduler.step()
 
@@ -107,17 +110,18 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     return model
 
 
-model_ft = densenet121(pretrained=False)
+if __name__ == "__main__":
+    model_ft = densenet121(pretrained=False)
 
-model_ft = model_ft.to(device)
+    model_ft = model_ft.to(device)
 
-criterion = nn.CrossEntropyLoss(weight=training.weights)
+    criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
 
-# Observe that all parameters are being optimized
-optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+    # Observe that all parameters are being optimized
+    optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
-# Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=50)
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+                        num_epochs=50)

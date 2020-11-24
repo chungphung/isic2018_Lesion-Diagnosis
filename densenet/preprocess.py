@@ -16,11 +16,10 @@ def _random_crop(image):
 
 def _distort(image):
     h, w, c = image.shape
-    no_px = int(h*w*0.05)
 
     x = np.random.choice(h, 77, replace=False)
     y = np.random.choice(w, 78, replace=False)
-    idx_list = np.array(list(zip(cycle(y), x))[:-6]).T.tolist()
+    idx_list = tuple(np.array(list(zip(cycle(y), x))[:-6]).T)
 
     val = random.randint(-5, 5)
 
@@ -48,7 +47,7 @@ class preproc(object):
         self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
     def __call__(self, image, targets):
-        labels = torch.Tensor([self.labels_names.index(targets)])
+        labels = torch.tensor(np.array([self.labels_names.index(targets)]), dtype=torch.long)
         image_t = _random_crop(image)
         if bool(random.getrandbits(1)):
             image_t = _distort(image_t)
