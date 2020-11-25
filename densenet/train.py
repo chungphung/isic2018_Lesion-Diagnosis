@@ -1,4 +1,13 @@
 from __future__ import division, print_function
+from preprocess import preproc
+from densenet import densenet121
+from dataset import dataloader
+from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
+from torch.optim import lr_scheduler
+import torch.optim as optim
+import torch.nn as nn
+import torch
 
 import copy
 import os
@@ -6,16 +15,7 @@ import time
 from datetime import datetime
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
-from dataset import dataloader
-from densenet import densenet121
-from preprocess import preproc
 
 training_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
 training_data = '../../data/ISIC2018_Task3_Training_Input'
@@ -107,11 +107,13 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 if phase == 'train':
                     train_loss += loss.item() * images.size(0)
                     train_correct += torch.sum(preds == labels.data)
-                    print(f'epoch {epoch} - step {step}/{iteration} - TrainingLoss {loss}')
+                    print(
+                        f'epoch {epoch} - step {step}/{iteration} - TrainingLoss {loss}')
                 else:
                     val_loss += loss.item() * images.size(0)
                     val_correct += torch.sum(preds == labels.data)
-                    print(f'epoch {epoch} - step {step}/{iteration} - ValidateLoss {loss}')
+                    print(
+                        f'epoch {epoch} - step {step}/{iteration} - ValidateLoss {loss}')
 
             if phase == 'train':
                 scheduler.step()
@@ -133,11 +135,12 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if phase == 'val' and epoch_loss < lowest_val_loss:
                 lowest_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
-        
+
         # save weight every epoch
-        torch.save(model.state_dict(), f'./weights/state_{model_name}.pth')
+        torch.save(model.state_dict(),
+                   f'./weights/state_{model_name}_epoch{epoch}.pth')
         # save full model every epoch
-        torch.save(model, f'./weights/full_{model_name}.pth')
+        torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
