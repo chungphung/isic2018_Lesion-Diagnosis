@@ -1,18 +1,20 @@
 from __future__ import division, print_function
-from preprocess import preproc
-from densenet import densenet121
-from dataset import dataloader
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DataLoader
-from torch.optim import lr_scheduler
-import torch.optim as optim
-import torch.nn as nn
-import torch
 
 import copy
 import os
 import time
 from datetime import datetime
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+from dataset import dataloader
+from densenet import densenet121
+from preprocess import preproc
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
