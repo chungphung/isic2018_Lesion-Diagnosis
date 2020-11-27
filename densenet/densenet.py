@@ -9,7 +9,8 @@ from torch import Tensor
 from torch.hub import load_state_dict_from_url
 from torch.jit.annotations import List
 
-__all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet161']
+__all__ = ['DenseNet', 'densenet121',
+           'densenet169', 'densenet201', 'densenet161']
 
 model_urls = {
     'densenet121': 'https://download.pytorch.org/models/densenet121-a639ec97.pth',
@@ -176,10 +177,12 @@ class DenseNet(nn.Module):
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
 
         # Linear layer
-        self.classifier = nn.Sequential(OrderedDict([
-            ('intermediate_fc1', nn.Linear(num_features, 512)), 
-            ('intermediate_fc2', nn.Linear(512, 128)),
-            ('classifier', nn.Linear(128, num_classes))]))
+        # self.classifier = nn.Sequential(OrderedDict([
+        #     ('intermediate_fc1', nn.Linear(num_features, 512)),
+        #     ('intermediate_fc2', nn.Linear(512, 128)),
+        #     ('classifier', nn.Linear(128, num_classes))]))
+
+        self.classifier = nn.Linear(num_features, 1000)
 
         # Official init from torch repo.
         for m in self.modules():

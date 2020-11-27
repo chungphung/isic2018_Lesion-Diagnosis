@@ -23,8 +23,9 @@ training_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Tr
 training_data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, training_data, preproc(), True, 0.8)
-validation = dataloader(training_csv, training_data, preproc(), False, 0.2)
+training = dataloader(training_csv, training_data, preproc(), 'training', 0.8)
+validation = dataloader(training_csv, training_data,
+                        preproc(), 'validate', 0.2)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -161,7 +162,11 @@ if __name__ == "__main__":
     now = datetime.now()
     model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
-    model_ft = densenet121(pretrained=False)
+    model_ft = densenet121(pretrained=True)
+    num_ftrs = model_ft.classifier.in_features
+    # Here the size of each output sample is set to 2.
+    # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
+    model_ft.classifier = nn.Linear(num_ftrs, 7)
     model_ft = model_ft.to(device)
 
     criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
