@@ -14,6 +14,16 @@ def _random_crop(image):
     return img_t
 
 
+def _brightness(image):
+    h,s,v = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)[:, :, 2]
+    rand_value = random.randint(-50, 50)
+    v[v+rand_value<255]+=rand_value
+    v[v+rand_value>=255]=255
+    tmp = cv2.merge([h, s, v])
+    img_t = cv2.cvtColor(tmp, cv2.COLOR_HSV2BGR)
+    return img_t
+
+
 def _distort(image):
     h, w, c = image.shape
 
@@ -46,12 +56,17 @@ class preproc(object):
     def __init__(self):
         self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-    def __call__(self, image, targets):
-        labels = torch.tensor(np.array([self.labels_names.index(targets)]), dtype=torch.long)
-        image_t = _random_crop(image)
-        if bool(random.getrandbits(1)):
-            image_t = _distort(image_t)
-        if bool(random.getrandbits(1)):
-            image_t = _mirror(image_t)
-        image_t = (image_t/255.0).astype(np.float32)
+    def __call__(self, image, targets, phase):
+        if phase == 'training' or phase == 'validating':
+            labels = torch.tensor(
+                np.array([self.labels_names.index(targets)]), dtype=torch.long)
+            image_t = _random_crop(image)
+            if bool(random.getrandbits(1)):
+                image_t = _distort(image_t)
+            if bool(random.getrandbits(1)):
+                image_t = _mirror(image_t)
+            image_t = (image_t/255.0).astype(np.float32)
+        else:
+            labels = [targets]
+            image_t = (image/255.0).astype(np.float32)
         return image_t, labels

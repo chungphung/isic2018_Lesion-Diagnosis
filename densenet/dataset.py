@@ -15,14 +15,14 @@ class dataloader(data.Dataset):
         self.labels = []
         self.weights = []
         self.mode = mode
-        if mode == 'training':
+        if self.mode == 'training':
             df = pd.read_csv(txt_path)
             tmp = []
             for col in df.columns[1:]:
                 tmp.append((df[col] == 1).sum())
             self.weights = torch.Tensor(tmp/sum(tmp))
             img_list = list(df['image'])[:int(len(df)*percents)]
-        elif mode == 'validate':
+        elif self.mode == 'validate':
             df = pd.read_csv(txt_path)
             tmp = []
             for col in df.columns[1:]:
@@ -35,7 +35,7 @@ class dataloader(data.Dataset):
         for i in img_list:
             image_name = i if '.jpg' in i else i+'.jpg'
             self.imgs_path.append(join(data_path, image_name))
-            if mode == 'training' or mode == 'validate':
+            if self.mode == 'training' or self.mode == 'validate':
                 tmp_label = df[df['image'] == i].apply(
                     lambda x: df.columns[x == 1], axis=1).to_string(header=False)
                 self.labels.append(tmp_label.split()[1][8:-3])
@@ -45,14 +45,11 @@ class dataloader(data.Dataset):
 
     def __getitem__(self, index):
         img = cv2.imread(self.imgs_path[index])
-
-        try:
+        if self.mode == 'training' or self.mode == 'validate':
             label = self.labels[index]
-        except:
-            label = 'NV'
-        if self.preproc is not None:
-            img, target = self.preproc(img, label)
+            img, target = self.preproc(img, label, self.mode)
         else:
-            target = label
-            img = (img/255.0).astype(np.float32)
+            target = self.imgs_path[index]
+            img, target = self.preproc(img, target, self.mode)
+            return img.transpose(2, 0, 1), target
         return torch.from_numpy(img.transpose(2, 0, 1)), target

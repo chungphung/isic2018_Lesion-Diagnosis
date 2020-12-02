@@ -139,9 +139,6 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 lowest_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
 
-        # save weight every epoch
-        torch.save(model.state_dict(),
-                   f'./weights/state_{model_name}_epoch{epoch}.pth')
         # save full model every epoch
         torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
 
