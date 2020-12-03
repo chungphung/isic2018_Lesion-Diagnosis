@@ -15,12 +15,15 @@ def _random_crop(image):
 
 
 def _brightness(image):
-    h,s,v = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)[:, :, 2]
+    h, s, v = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)[:, :, 2]
     rand_value = random.randint(-50, 50)
-    v[v+rand_value<255]+=rand_value
-    v[v+rand_value>=255]=255
-    tmp = cv2.merge([h, s, v])
-    img_t = cv2.cvtColor(tmp, cv2.COLOR_HSV2BGR)
+    if rand_value >= 0:
+        v[v+rand_value >= 255] = 255
+        v[v+rand_value < 255] += rand_value
+    else:
+        v[v+rand_value <= 0] = 0
+        v[v-abs(rand_value) > 0] -= abs(rand_value)
+    img_t = cv2.cvtColor(cv2.merge([h, s, v]), cv2.COLOR_HSV2BGR)
     return img_t
 
 
@@ -60,11 +63,16 @@ class preproc(object):
         if phase == 'training' or phase == 'validate':
             labels = torch.tensor(
                 np.array([self.labels_names.index(targets)]), dtype=torch.long)
-            image_t = _random_crop(image)
-            if bool(random.getrandbits(1)):
-                image_t = _distort(image_t)
-            if bool(random.getrandbits(1)):
-                image_t = _mirror(image_t)
+            if phase == 'training':
+                image_t = _random_crop(image)
+                if bool(random.getrandbits(1)):
+                    image_t = _distort(image_t)
+                if bool(random.getrandbits(1)):
+                    image_t = _mirror(image_t)
+                if bool(random.getrandbits(1)):
+                    _rotate(image)
+            else:
+                image_t = image
             image_t = (image_t/255.0).astype(np.float32)
         else:
             labels = [targets]

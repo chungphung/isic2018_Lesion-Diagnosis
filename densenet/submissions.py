@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/full_densenet121_AutoWtdCE_2020-11-30_18-13_epoch99.pth'
+model_path = './weights/full_densenet121_AutoWtdCE_2020-12-03_18-35_epoch49.pth'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -87,7 +87,10 @@ def summision_generate(model, batch_size, voting=True):
         df[k] = result[k]
 
     # saving the dataframe
-    df.to_csv(f'./submissions/novoting_{basename(model_path)[:-4]}.csv', index=False)
+    if voting:
+        df.to_csv(f'./submissions/voting_{basename(model_path)[:-4]}.csv', index=False)
+    else:
+        df.to_csv(f'./submissions/novoting_{basename(model_path)[:-4]}.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(

@@ -75,7 +75,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=4))
+                    dataloaders[phase], batch_size, shuffle=False, num_workers=4))
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
@@ -153,13 +153,13 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
 
 if __name__ == "__main__":
-    # default `log_dir` is "runs" - we'll be more specific here
-    writer = SummaryWriter('runs/densenet_crossentropy_weighted_auto')
-
     now = datetime.now()
-    model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
+    model_name = f'densenet201_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
-    model_ft = densenet121(pretrained=True)
+    # default `log_dir` is "runs" - we'll be more specific here
+    writer = SummaryWriter(f'runs/{model_name}')
+
+    model_ft = densenet201(pretrained=True)
     num_ftrs = model_ft.classifier.in_features
     # Here the size of each output sample is set to 2.
     # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = lr_scheduler.StepLR(
-        optimizer_ft, step_size=7, gamma=0.1)
+        optimizer_ft, step_size=10, gamma=0.1)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft,
                            exp_lr_scheduler, writer, model_name, batch_size=12, num_epochs=50)
