@@ -57,7 +57,7 @@ class preproc(object):
         self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
     def __call__(self, image, targets, phase):
-        if phase == 'training' or phase == 'validating':
+        if phase == 'training' or phase == 'validate':
             labels = torch.tensor(
                 np.array([self.labels_names.index(targets)]), dtype=torch.long)
             image_t = _random_crop(image)
