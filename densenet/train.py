@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset import dataloader
-from densenet import densenet121
+from densenet import densenet121, densenet201
 from preprocess import preproc
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -176,4 +176,4 @@ if __name__ == "__main__":
         optimizer_ft, step_size=10, gamma=0.1)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=12, num_epochs=50)
+                           exp_lr_scheduler, writer, model_name, batch_size=8, num_epochs=50)
