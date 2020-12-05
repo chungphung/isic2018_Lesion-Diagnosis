@@ -16,12 +16,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/full_densenet121_AutoWtdCE_2020-12-03_18-35_epoch49.pth'
+model_path = './weights/full_densenet121_AutoWtdCE_2020-12-05_2-56_epoch26.pth'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 # dataloader
-test_loader = dataloader(None, test_data, preproc(), 'test', 1)
+test_loader = dataloader(None, test_data, preproc(), 'test')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -101,4 +101,4 @@ if __name__ == "__main__":
     model = torch.load(model_path)
     model = model.to(device)
 
-    summision_generate(model, batch_size=12, voting=False)
+    summision_generate(model, batch_size=20, voting=False)

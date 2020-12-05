@@ -19,13 +19,13 @@ from preprocess import preproc
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
-training_data = '../../data/ISIC2018_Task3_Training_Input'
+training_csv = './Densenet/train.csv'
+validate_csv = './Densenet/val.csv'
+data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, training_data, preproc(), 'training', 0.8)
-validation = dataloader(training_csv, training_data,
-                        preproc(), 'validate', 0.2)
+training = dataloader(training_csv, data, preproc(), 'training')
+validation = dataloader(validate_csv, data, preproc(), 'validate')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -138,28 +138,30 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if phase == 'val' and epoch_loss < lowest_val_loss:
                 lowest_val_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
+                best_epoch = epoch
 
-        # save full model every epoch
-        torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
+        # save full model last epoch
+        if epoch == num_epochs-1:
+            torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print('Best val Loss: {:4f}'.format(lowest_val_loss))
 
-    # load best model weights
-    model.load_state_dict(best_model_wts)
+    # save best model weights
+    torch.save(model, f'./weights/full_{model_name}_epoch{best_epoch}.pth')
     return model
 
 
 if __name__ == "__main__":
     now = datetime.now()
-    model_name = f'densenet201_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
+    model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
 
-    model_ft = densenet201(pretrained=True)
+    model_ft = densenet121(pretrained=True)
     num_ftrs = model_ft.classifier.in_features
     # Here the size of each output sample is set to 2.
     # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
@@ -176,4 +178,4 @@ if __name__ == "__main__":
         optimizer_ft, step_size=10, gamma=0.1)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=8, num_epochs=50)
+                           exp_lr_scheduler, writer, model_name, batch_size=12, num_epochs=50)

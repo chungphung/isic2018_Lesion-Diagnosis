@@ -9,25 +9,20 @@ import torch.utils.data as data
 
 
 class dataloader(data.Dataset):
-    def __init__(self, txt_path, data_path, preproc=None, mode='training', percents=1):
+    def __init__(self, txt_path, data_path, preproc=None, mode='training'):
         self.preproc = preproc
         self.imgs_path = []
         self.labels = []
         self.weights = []
         self.mode = mode
-        if self.mode == 'training':
+        if self.mode == 'training' or self.mode == 'validate':
             df = pd.read_csv(txt_path)
             tmp = []
             for col in df.columns[1:]:
-                tmp.append((df[col] == 1).sum())
-            self.weights = torch.Tensor(tmp/sum(tmp))
-            img_list = list(df['image'])[:int(len(df)*percents)]
-        elif self.mode == 'validate':
-            df = pd.read_csv(txt_path)
-            tmp = []
-            for col in df.columns[1:]:
-                tmp.append((df[col] == 1).sum())
-            img_list = list(df['image'])[-int(len(df)*percents):]
+                tmp = (df[col] == 1).sum()
+                self.weights.append(len(df.image)/(7*tmp))
+            img_list = list(df['image'])
+            self.weights = torch.tensor(self.weights)
         else:
             img_list = listdir(data_path)
             del img_list[img_list.index('ATTRIBUTION.txt')]
