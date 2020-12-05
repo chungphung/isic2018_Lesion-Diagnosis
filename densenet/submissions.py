@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/full_densenet121_AutoWtdCE_2020-12-05_13-22_epoch49.pth'
+model_path = './weights/full_densenet121_AutoWtdCE_2020-12-05_19-46_epoch49.pth'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -101,4 +101,4 @@ if __name__ == "__main__":
     model = torch.load(model_path)
     model = model.to(device)
 
-    summision_generate(model, batch_size=24, voting=True)
+    summision_generate(model, batch_size=24, voting=False)
