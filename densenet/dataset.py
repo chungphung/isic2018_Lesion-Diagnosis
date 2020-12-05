@@ -20,9 +20,9 @@ class dataloader(data.Dataset):
             tmp = []
             for col in df.columns[1:]:
                 tmp = (df[col] == 1).sum()
-                self.weights.append(len(df.image)/(7*tmp))
+                self.weights.append(float(len(df.image)/(7*tmp)))
             img_list = list(df['image'])
-            self.weights = torch.tensor(self.weights)
+            self.weights = torch.tensor(self.weights).float()
         else:
             img_list = listdir(data_path)
             del img_list[img_list.index('ATTRIBUTION.txt')]
