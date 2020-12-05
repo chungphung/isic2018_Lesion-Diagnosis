@@ -148,6 +148,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print('Best val Loss: {:4f}'.format(lowest_val_loss))
+        print(f'Best epoch: {best_epoch}')
 
     # save best model weights
     torch.save(model, f'./weights/full_{model_name}_epoch{best_epoch}.pth')

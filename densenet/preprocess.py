@@ -15,7 +15,8 @@ def _random_crop(image):
 
 
 def _brightness(image):
-    h, s, v = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)[:, :, 2]
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    v = hsv[:, :, 2]
     rand_value = random.randint(-50, 50)
     if rand_value >= 0:
         v[v+rand_value >= 255] = 255
@@ -23,7 +24,8 @@ def _brightness(image):
     else:
         v[v+rand_value <= 0] = 0
         v[v-abs(rand_value) > 0] -= abs(rand_value)
-    img_t = cv2.cvtColor(cv2.merge([h, s, v]), cv2.COLOR_HSV2BGR)
+    hsv[:, :, 2] = v
+    img_t = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     return img_t
 
 
@@ -32,7 +34,10 @@ def _distort(image):
 
     x = np.random.choice(h, 77, replace=False)
     y = np.random.choice(w, 78, replace=False)
-    idx_list = tuple(np.array(list(zip(cycle(y), x))[:-6]).T)
+    idx_list = []
+    for i in range(len(x)):
+        for j in range(len(y)):
+            idx_list.append((x[i], y[j]))
 
     val = random.randint(-5, 5)
 
@@ -66,11 +71,13 @@ class preproc(object):
             if phase == 'training':
                 image_t = _random_crop(image)
                 if bool(random.getrandbits(1)):
+                    image_t = _brightness(image_t)
+                if bool(random.getrandbits(1)):
                     image_t = _distort(image_t)
                 if bool(random.getrandbits(1)):
                     image_t = _mirror(image_t)
                 if bool(random.getrandbits(1)):
-                    _rotate(image)
+                    image_t = _rotate(image_t)
             else:
                 image_t = image
             image_t = (image_t/255.0).astype(np.float32)
