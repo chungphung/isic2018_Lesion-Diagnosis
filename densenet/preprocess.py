@@ -29,7 +29,7 @@ def _brightness(image):
     return img_t
 
 
-def _distort(image):
+def _noise(image):
     h, w, c = image.shape
 
     x = np.random.choice(h, 77, replace=False)
@@ -73,7 +73,7 @@ class preproc(object):
                 if bool(random.getrandbits(1)):
                     image_t = _brightness(image_t)
                 if bool(random.getrandbits(1)):
-                    image_t = _distort(image_t)
+                    image_t = _noise(image_t)
                 if bool(random.getrandbits(1)):
                     image_t = _mirror(image_t)
                 if bool(random.getrandbits(1)):

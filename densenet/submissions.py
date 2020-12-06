@@ -1,7 +1,5 @@
 import os
 import time
-from datetime import datetime
-from math import e
 from os.path import basename
 
 import numpy as np
