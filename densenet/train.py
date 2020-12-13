@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import dataloader
 from densenet import densenet121, densenet201
 from preprocess import preproc
+from ArcMarginModel import ArcMarginModel
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -51,11 +52,11 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
     ######################
 
 
-def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25):
 
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
-    lowest_val_loss = 10.0
+    lowest_val_loss = 100.0
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -92,6 +93,8 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(images)
+                    if arccos!=None:
+                        outputs = arc_margin(outputs, labels)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
 
@@ -159,6 +162,8 @@ if __name__ == "__main__":
     now = datetime.now()
     model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
+    arccos = True 
+
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
 
@@ -166,10 +171,17 @@ if __name__ == "__main__":
     num_ftrs = model_ft.classifier.in_features
     # Here the size of each output sample is set to 2.
     # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-    model_ft.classifier = nn.Linear(num_ftrs, 7)
-    model_ft = model_ft.to(device)
+    
 
-    criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
+    if arccos:
+        model_ft.classifier = nn.Linear(num_ftrs, 512)
+        model_ft = model_ft.to(device)
+        arc_margin = ArcMarginModel(device).to(device)
+        criterion = nn.CrossEntropyLoss()
+    else:
+        model_ft.classifier = nn.Linear(num_ftrs, 7)
+        model_ft = model_ft.to(device)
+        criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
 
     # Observe that all parameters are being optimized
     optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
@@ -179,4 +191,4 @@ if __name__ == "__main__":
         optimizer_ft, step_size=10, gamma=0.1)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=12, num_epochs=50)
+                           exp_lr_scheduler, writer, model_name,  batch_size=12, arccos=arc_margin, num_epochs=50)

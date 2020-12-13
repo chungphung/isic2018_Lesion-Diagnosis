@@ -176,12 +176,6 @@ class DenseNet(nn.Module):
         # Final batch norm
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
 
-        # Linear layer
-        # self.classifier = nn.Sequential(OrderedDict([
-        #     ('intermediate_fc1', nn.Linear(num_features, 512)),
-        #     ('intermediate_fc2', nn.Linear(512, 128)),
-        #     ('classifier', nn.Linear(128, num_classes))]))
-
         self.classifier = nn.Linear(num_features, 1000)
 
         # Official init from torch repo.
