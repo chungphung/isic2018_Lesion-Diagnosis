@@ -8,13 +8,15 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from ArcMarginModel import ArcMarginModel
 from dataset import dataloader
 from preprocess import preproc
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/full_densenet121_AutoWtdCE_2020-12-05_19-46_epoch49.pth'
+model_path = './weights/full_densenet121_AutoWtdCE_2020-12-13_14-57_epoch49.pth'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -32,7 +34,7 @@ def full_crop(image):
     return img_t
 
 
-def summision_generate(model, batch_size, voting=True):
+def summision_generate(model, batch_size, arccos=None, voting=True):
 
     result = {}
     since = time.time()
@@ -56,6 +58,8 @@ def summision_generate(model, batch_size, voting=True):
         # run predictions
         with torch.set_grad_enabled(False):
             outputs = model(images)
+            if arccos != None:
+                outputs = arc_margin(outputs, labels)
             preds = torch.softmax(outputs, dim=1)
             onehot = np.eye(7)[torch.argmax(preds.cpu(), dim=1)]
 
@@ -86,9 +90,11 @@ def summision_generate(model, batch_size, voting=True):
 
     # saving the dataframe
     if voting:
-        df.to_csv(f'./submissions/voting_{basename(model_path)[:-4]}.csv', index=False)
+        df.to_csv(
+            f'./submissions/voting_{basename(model_path)[:-4]}.csv', index=False)
     else:
-        df.to_csv(f'./submissions/novoting_{basename(model_path)[:-4]}.csv', index=False)
+        df.to_csv(
+            f'./submissions/novoting_{basename(model_path)[:-4]}.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(
@@ -96,7 +102,12 @@ def summision_generate(model, batch_size, voting=True):
 
 
 if __name__ == "__main__":
-    model = torch.load(model_path)
-    model = model.to(device)
-
-    summision_generate(model, batch_size=24, voting=False)
+    arccos = True
+    if arccos:
+        model = torch.load(model_path)
+        model = model.to(device)
+        arc_margin = ArcMarginModel(device).to(device)
+    else:
+        model = torch.load(model_path)
+        model = model.to(device)
+    summision_generate(model, batch_size=24, arccos=arc_margin, voting=False)

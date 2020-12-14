@@ -93,7 +93,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(images)
-                    if arccos!=None:
+                    if arccos is not None:
                         outputs = arc_margin(outputs, labels)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
@@ -106,6 +106,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
+                        optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
 
@@ -145,7 +146,10 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
         # save full model last epoch
         if epoch == num_epochs-1:
-            torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
+            if arccos is None:
+                torch.save(model, f'./weights/full_{model_name}_epoch{epoch}.pth')
+            else:
+                torch.save({'model':model, 'arccos':arc_margin}, f'./weights/full_{model_name}_epoch{epoch}.pth')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -162,7 +166,7 @@ if __name__ == "__main__":
     now = datetime.now()
     model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
-    arccos = True 
+    arccos = True
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
@@ -171,20 +175,21 @@ if __name__ == "__main__":
     num_ftrs = model_ft.classifier.in_features
     # Here the size of each output sample is set to 2.
     # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-    
 
     if arccos:
         model_ft.classifier = nn.Linear(num_ftrs, 512)
         model_ft = model_ft.to(device)
         arc_margin = ArcMarginModel(device).to(device)
         criterion = nn.CrossEntropyLoss()
+        optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {'params': arc_margin.parameters()}], lr=0.01, momentum=0.9)
     else:
         model_ft.classifier = nn.Linear(num_ftrs, 7)
         model_ft = model_ft.to(device)
         criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
+        optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.01, momentum=0.9)
 
     # Observe that all parameters are being optimized
-    optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+    
 
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = lr_scheduler.StepLR(
