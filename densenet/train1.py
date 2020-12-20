@@ -11,18 +11,19 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from dataset import dataloader
 from densenet import densenet121, densenet201
 from preprocess import preproc
-from ArcMarginModel import ArcMarginModel, Arcface
-from torch import autograd
+from ArcMarginModel import ArcMarginModel
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = './Densenet/train.csv'
-validate_csv = './Densenet/val.csv'
-data = '../../data/ISIC2018_Task3_Training_Input'
+training_csv = './densenet/train.csv'
+validate_csv = './densenet/val.csv'
+data = './data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, preproc(), 'training')
@@ -55,7 +56,7 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
 def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25):
 
     since = time.time()
-    
+    best_model_wts = copy.deepcopy(model.state_dict())
     lowest_val_loss = 100.0
 
     for epoch in range(num_epochs):
@@ -72,11 +73,11 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=4))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=False, num_workers=4))
+                    dataloaders[phase], batch_size, shuffle=False, num_workers=20))
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
@@ -106,6 +107,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
+                        optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
 
@@ -141,17 +143,19 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             # deep copy the model
             if phase == 'val' and epoch_loss < lowest_val_loss:
                 lowest_val_loss = epoch_loss
-                best_model = copy.deepcopy(model)
+                best_model_wts = copy.deepcopy(model.state_dict())
                 best_epoch = epoch
-                if arccos is not None:
-                    best_arc = copy.deepcopy(arc_margin)
+                if arccos is None:
+                    torch.save(model, f'./weights/{model_name}_epoch{epoch}.pth')
+                else:
+                    torch.save({'model':model, 'arccos':arc_margin}, f'./weights/{model_name}_epoch{epoch}.tar')
 
         # save full model last epoch
         if epoch == num_epochs-1:
             if arccos is None:
                 torch.save(model, f'./weights/{model_name}_epoch{epoch}.pth')
             else:
-                torch.save({'model':model, 'arccos':arc_margin}, f'./weights/{model_name}_epoch{epoch}.pth')
+                torch.save({'model':model, 'arccos':arc_margin}, f'./weights/{model_name}_epoch{epoch}.tar')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -160,27 +164,25 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         print(f'Best epoch: {best_epoch}')
 
     # save best model weights
-    if arccos is None:
-        torch.save(best_model, f'./weights/best_{model_name}_epoch{best_epoch}.pth')
-    else:
-        torch.save({'model':best_model, 'arccos':best_arc}, f'./weights/best_{model_name}_epoch{best_epoch}.pth')
+    torch.save(model, f'./weights/{model_name}_epoch{best_epoch}.pth')
     return model
 
 
 if __name__ == "__main__":
     now = datetime.now()
-    model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
-
     arccos = True
+    if arccos:
+        model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
+    else:
+        model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
+
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
 
     model_ft = densenet121(pretrained=True)
     num_ftrs = model_ft.classifier.in_features
-    # Here the size of each output sample is set to 2.
-    # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-
+        
     if arccos:
         model_ft.classifier = nn.Linear(num_ftrs, 512)
         model_ft = model_ft.to(device)
@@ -188,15 +190,19 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss()
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {'params': arc_margin.parameters()}], lr=0.01, momentum=0.9)
     else:
-        model_ft.classifier = nn.Sequential(nn.Dropout(0.2), nn.Linear(num_ftrs, 7))
+        model_ft.classifier = nn.Linear(num_ftrs, 7)
         model_ft = model_ft.to(device)
         criterion = nn.CrossEntropyLoss(weight=training.weights.to(device))
         optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+        arccos = None
+
+    # Observe that all parameters are being optimized
+    
 
     # Decay LR by a factor of 0.1 every 7 epochs
-    #     exp_lr_scheduler = lr_scheduler.StepLR(
+#     exp_lr_scheduler = lr_scheduler.StepLR(
 #         optimizer_ft, step_size=10, gamma=0.1)
-#     exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[13,20], gamma=0.1)
+#     exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[56], gamma=0.1)
 
     model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           None, writer, model_name, batch_size=32, arccos=None, num_epochs=100)
+                           exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=150)

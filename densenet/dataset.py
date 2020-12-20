@@ -46,5 +46,4 @@ class dataloader(data.Dataset):
         else:
             target = self.imgs_path[index]
             img, target = self.preproc(img, target, self.mode)
-            return img.transpose(2, 0, 1), target
         return torch.from_numpy(img.transpose(2, 0, 1)), target
