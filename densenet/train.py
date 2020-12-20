@@ -151,7 +151,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if arccos is None:
                 torch.save(model, f'./weights/{model_name}_epoch{epoch}.pth')
             else:
-                torch.save({'model':model, 'arccos':arc_margin}, f'./weights/{model_name}_epoch{epoch}.pth')
+                torch.save({'model':model, 'arccos':arc_margin}, f'./weights/{model_name}_epoch{epoch}.tar')
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -163,7 +163,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
     if arccos is None:
         torch.save(best_model, f'./weights/best_{model_name}_epoch{best_epoch}.pth')
     else:
-        torch.save({'model':best_model, 'arccos':best_arc}, f'./weights/best_{model_name}_epoch{best_epoch}.pth')
+        torch.save({'model':best_model, 'arccos':best_arc}, f'./weights/best_{model_name}_epoch{best_epoch}.tar')
     return model
 
 
