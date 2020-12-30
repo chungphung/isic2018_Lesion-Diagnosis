@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/densenet121_ArcMargin_2020-12-20_0-19_epoch149.tar'
+model_path = './weights/densenet121_ArcMargin_2020-12-29_23-27_epoch82.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -94,7 +94,7 @@ def summision_generate(model, batch_size, arccos=None, voting=True):
             f'./submissions/voting_{basename(model_path)[:-4]}.csv', index=False)
     else:
         df.to_csv(
-            f'./submissions/novoting_{basename(model_path)[:-4]}.csv', index=False)
+            f'./submissions/{basename(model_path)[:-4]}.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(
