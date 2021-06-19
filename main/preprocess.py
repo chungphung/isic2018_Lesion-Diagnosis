@@ -10,7 +10,16 @@ import torch
 def _random_crop(image):
     r = random.randint(0, 3)
     c = random.randint(0, 4)
-    img_t = image[50*r:50*r+300, 50*c:50*c+400]
+#     img_t = image[25*r:25*r+350, 25*c:25*c+450]
+#     img_t = image[25*r:25*r+224, 25*c:25*c+224]
+    img_t = image[:, 25*c:25*c+450]
+    return img_t
+
+
+def _center_crop(image):
+    #     img_t = image[50:400, 75:525]
+    #     img_t = image[113:337, 188:412]
+    img_t = image[:, 75:525]
     return img_t
 
 
@@ -27,24 +36,6 @@ def _brightness(image):
     hsv[:, :, 2] = v
     img_t = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     return img_t
-
-
-def _noise(image):
-    h, w, c = image.shape
-
-    x = np.random.choice(h, 77, replace=False)
-    y = np.random.choice(w, 78, replace=False)
-    idx_list = []
-    for i in range(len(x)):
-        for j in range(len(y)):
-            idx_list.append((x[i], y[j]))
-
-    val = random.randint(-5, 5)
-
-    image_t = image.transpose(1, 0, 2)
-    image_t[idx_list] += np.uint8(val)
-    image = image_t.transpose(1, 0, 2)
-    return image
 
 
 def _mirror(image):
@@ -69,19 +60,21 @@ class preproc(object):
             labels = torch.tensor(
                 np.array([self.labels_names.index(targets)]), dtype=torch.long)
             if phase == 'training':
-                image_t = _random_crop(image)
+                if bool(random.getrandbits(1)):
+                    image_t = _center_crop(image)
+                else:
+                    image_t = _random_crop(image)
                 if bool(random.getrandbits(1)):
                     image_t = _brightness(image_t)
-                if bool(random.getrandbits(1)):
-                    image_t = _noise(image_t)
                 if bool(random.getrandbits(1)):
                     image_t = _mirror(image_t)
                 if bool(random.getrandbits(1)):
                     image_t = _rotate(image_t)
             else:
-                image_t = image
+                image_t = _center_crop(image)
             image_t = (image_t/255.0).astype(np.float32)
         else:
             labels = [targets]
+            image = _center_crop(image)
             image_t = (image/255.0).astype(np.float32)
         return image_t, labels

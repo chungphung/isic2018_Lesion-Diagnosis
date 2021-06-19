@@ -22,9 +22,9 @@ from FocalLoss import FocalLoss
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = './densenet/train.csv'
-validate_csv = './densenet/val.csv'
-data = './data/ISIC2018_Task3_Training_Input'
+training_csv = './main/train.csv'
+validate_csv = './main/val.csv'
+data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, preproc(), 'training')
@@ -52,7 +52,7 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
     ######################
 
 
-def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1, tolerance = 5):
 
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -67,12 +67,15 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         train_correct = 0
         val_correct = 0
         # Each epoch has a training and validation phase
+        count = 0
+        lowest_train_loss = 9999
+        
         for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=0))
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
@@ -80,6 +83,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
+            
             for step in range(iteration):
                 images, labels = next(batch_iterator)
                 images = images.to(device)
@@ -125,13 +129,25 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if phase == 'train':
                 if scheduler is not None:
                     scheduler.step()
+                
+
             if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
+                
+                if lowest_train_loss <= epoch_loss:
+                    count+=1
+                else:
+                    lowest_train_loss = epoch_loss
+                if count==tolerance:
+                    print(arc_margin.s, arc_margin.m, arc_margin.cos_m, arc_margin.sin_m, arc_margin.th, arc_margin.mm)
+                    arc_margin.m*=alpha
+                    count=0
+                
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])
                 epoch_acc = val_correct.double() / len(dataloaders[phase])
-
+            
             # training visualizing
             visualizing(phase, epoch, step, epoch_loss, epoch_acc)
             ######################
@@ -188,8 +204,9 @@ if __name__ == "__main__":
         model_ft.classifier = nn.Sequential(
             nn.Linear(num_ftrs, 512), nn.ReLU())
         model_ft = model_ft.to(device)
-        arc_margin = ArcMarginModel(device, m=0.15, s=5.0).to(device)
-        criterion = nn.CrossEntropyLoss()
+        arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
+        # criterion = nn.CrossEntropyLoss()
+        criterion = FocalLoss()
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
                                  'params': arc_margin.parameters()}], lr=0.01, momentum=0.9)
     else:
@@ -207,5 +224,10 @@ if __name__ == "__main__":
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
         optimizer_ft, milestones=[43], gamma=0.1)
 #     exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100)
+
+    tolerences = [5, 10] # number of epoch to wait for train loss decrease
+    alphas = [0.1, 0.5, 0.01, 0.05]
+    for tol in tolerences:
+        for a in alphas:
+            model_ft = train_model(model_ft, criterion, optimizer_ft,
+                           exp_lr_scheduler, writer, model_name, batch_size=2, arccos=arccos, num_epochs=100, alpha = a, tolerance = tol)

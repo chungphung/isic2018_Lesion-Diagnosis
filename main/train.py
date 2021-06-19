@@ -22,9 +22,9 @@ from FocalLoss import FocalLoss
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = './densenet/train.csv'
-validate_csv = './densenet/val.csv'
-data = './data/ISIC2018_Task3_Training_Input'
+training_csv = './main/train.csv'
+validate_csv = './main/val.csv'
+data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, preproc(), 'training')
@@ -71,7 +71,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=2))
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
@@ -126,6 +126,8 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                     scheduler.step()
             if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
+                import pdb
+                pdb.set_trace()
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])

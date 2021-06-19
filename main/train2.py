@@ -22,8 +22,8 @@ from FocalLoss import FocalLoss
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = './densenet/train.csv'
-validate_csv = './densenet/val.csv'
+training_csv = './main/train.csv'
+validate_csv = './main/val.csv'
 data = './data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -52,11 +52,12 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
     ######################
 
 
-def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1, tolerance = 5):
 
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     lowest_val_loss = 100.0
+    arc_decay = []
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -67,6 +68,9 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         train_correct = 0
         val_correct = 0
         # Each epoch has a training and validation phase
+        count = 0
+        lowest_train_loss = 9999
+        
         for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()  # Set model to training mode
@@ -80,6 +84,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
+            
             for step in range(iteration):
                 images, labels = next(batch_iterator)
                 images = images.to(device)
@@ -125,13 +130,26 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if phase == 'train':
                 if scheduler is not None:
                     scheduler.step()
+                
+
             if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
+                
+                if lowest_train_loss <= epoch_loss:
+                    count+=1
+                else:
+                    lowest_train_loss = epoch_loss
+#                 if count==tolerance:
+                if epoch==40:
+#                     print(arc_margin.s, arc_margin.m, arc_margin.cos_m, arc_margin.sin_m, arc_margin.th, arc_margin.mm)
+                    arc_margin.m*=alpha
+                    count=0
+                    arc_decay.append(epoch)
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])
                 epoch_acc = val_correct.double() / len(dataloaders[phase])
-
+            
             # training visualizing
             visualizing(phase, epoch, step, epoch_loss, epoch_acc)
             ######################
@@ -152,7 +170,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if arccos is None:
                 torch.save(model, f'./weights/{model_name}_epoch{epoch}.pth')
             else:
-                torch.save({'model': model, 'arccos': arc_margin, 'optimizer': optimizer},
+                torch.save({'model': model, 'arccos': arc_margin, 'optimizer': optimizer, 'arc_decay': arc_decay},
                            f'./weights/{model_name}_epoch{epoch}.tar')
 
         time_elapsed = time.time() - since
@@ -166,7 +184,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         torch.save(best_model, f'./weights/{model_name}_epoch{best_epoch}.pth')
     else:
         torch.save({'model': best_model, 'arccos': best_arc_margin,
-                    'optimizer': optimizer}, f'./weights/{model_name}_epoch{best_epoch}.tar')
+                    'optimizer': optimizer, 'arc_decay': arc_decay}, f'./weights/{model_name}_epoch{best_epoch}.tar')
     return model
 
 
@@ -191,7 +209,7 @@ if __name__ == "__main__":
         arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
-                                 'params': arc_margin.parameters()}], lr=0.1, momentum=0.9)
+                                 'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.01, momentum=0.9)
     else:
         model_ft.classifier = nn.Linear(num_ftrs, 7)
         model_ft = model_ft.to(device)
@@ -205,7 +223,6 @@ if __name__ == "__main__":
 #     exp_lr_scheduler = lr_scheduler.StepLR(
 #         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[20, 50], gamma=0.1)
-    exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100)
+        optimizer_ft, milestones=[20, 30], gamma=0.1)
+#     exp_lr_scheduler = None
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100, alpha = 1.3, tolerance = 5)

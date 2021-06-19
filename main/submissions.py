@@ -12,11 +12,15 @@ from ArcMarginModel import ArcMarginModel
 from dataset import dataloader
 from preprocess import preproc
 
+import warnings
+from torch.serialization import SourceChangeWarning
+warnings.filterwarnings("ignore", category=SourceChangeWarning)
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/densenet121_ArcMargin_2020-12-29_23-27_epoch82.tar'
+model_path = './weights/efficientnet_b2_ArcMargin_2021-06-18_17-57_epoch60.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -111,4 +115,4 @@ if __name__ == "__main__":
         model = torch.load(model_path)
         model = model.to(device)
         arc_margin = None
-    summision_generate(model, batch_size=24, arccos=arc_margin, voting=False)
+    summision_generate(model, batch_size=12, arccos=arc_margin, voting=False)

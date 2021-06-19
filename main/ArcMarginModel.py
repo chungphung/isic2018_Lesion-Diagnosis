@@ -20,19 +20,28 @@ class ArcMarginModel(nn.Module):
 
         self.easy_margin = False
         self.m = m
+        self.prev_m = m
         self.s = s
-
+        self.prev_s = s 
         self.cos_m = math.cos(self.m)
         self.sin_m = math.sin(self.m)
         self.th = math.cos(math.pi - self.m)
         self.mm = math.sin(math.pi - self.m) * self.m
 
     def forward(self, input, label, phase='train'):
+
         x = F.normalize(input)
         W = F.normalize(self.weight)
         cosine = F.linear(x, W)
+        sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
         if phase == 'train':
-            sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
+            if self.m!=self.prev_m or self.s!=self.prev_s:
+                self.cos_m = math.cos(self.m)
+                self.sin_m = math.sin(self.m)
+                self.th = math.cos(math.pi - self.m)
+                self.mm = math.sin(math.pi - self.m) * self.m
+                self.prev_s = self.s 
+                self.prev_m = self.m
             phi = cosine * self.cos_m - sine * self.sin_m  # cos(theta + m)
             if self.easy_margin:
                 phi = torch.where(cosine > 0, phi, cosine)
@@ -43,5 +52,6 @@ class ArcMarginModel(nn.Module):
             output = (one_hot * phi) + ((1.0 - one_hot) * cosine)
             output *= self.s
         else:
-            output = cosine*self.s
+            phi = cosine * self.cos_m + sine * self.sin_m  # cos(theta - m)
+            output = phi*self.s
         return output

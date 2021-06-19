@@ -20,7 +20,7 @@ class dataloader(data.Dataset):
             tmp = []
             for col in df.columns[1:]:
                 tmp = (df[col] == 1).sum()
-                self.weights.append(float(len(df.image)/(7*tmp)))
+                self.weights.append(float(len(df.image)/(7*tmp))) #total imgs/(7*class imgs)
             img_list = list(df['image'])
             self.weights = torch.tensor(self.weights).float()
         else:
