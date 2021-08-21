@@ -1,5 +1,4 @@
 import random
-from itertools import cycle
 
 import cv2
 import imutils
@@ -17,8 +16,8 @@ def _random_crop(image):
 
 
 def _center_crop(image):
-    #     img_t = image[50:400, 75:525]
-    #     img_t = image[113:337, 188:412]
+#     img_t = image[50:400, 75:525]
+#     img_t = image[113:337, 188:412]
     img_t = image[:, 75:525]
     return img_t
 
@@ -70,7 +69,7 @@ class preproc(object):
                     image_t = _mirror(image_t)
                 if bool(random.getrandbits(1)):
                     image_t = _rotate(image_t)
-            else:
+            else: # validate will go here!!!
                 image_t = _center_crop(image)
             image_t = (image_t/255.0).astype(np.float32)
         else:

@@ -35,14 +35,11 @@ def _confusion_matrix(model_name, score, y_true, y_pred):
     cfs.dtype = np.float
     for i in range(len(cfs)):
         cfs[i] = cfs[i]/sum(cfs[i])
-    df_cm = pd.DataFrame(cfs, index=['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC'], columns=[
-                         'pMEL', 'pNV', 'pBCC', 'pAKIEC', 'pBKL', 'pDF', 'pVASC'])
-    plt.figure(figsize=(10, 7))
-    sns_plot = sn.heatmap(df_cm, annot=True, square=True,
-                          cmap="YlGnBu").set_title(f'Score: {score}')
+    df_cm = pd.DataFrame(cfs, index = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC'], columns = ['pMEL', 'pNV', 'pBCC', 'pAKIEC', 'pBKL', 'pDF', 'pVASC'])
+    plt.figure(figsize = (10,7))
+    sns_plot = sn.heatmap(df_cm, annot=True, square=True, cmap="YlGnBu").set_title(f'Score: {score}')
     fig = sns_plot.get_figure()
     fig.savefig(f"./confusion_matrix/{model_name}.png", dpi=400)
-
 
 def check(model, model_name, score, batch_size):
 
@@ -74,13 +71,13 @@ def check(model, model_name, score, batch_size):
 
 
 if __name__ == "__main__":
-    for s, m in zip(scores, models):
+    for s,m in zip(scores,models):
         if '.ipynb_checkpoints' in m:
             continue
         print(m)
         model_path = f'./weights/{m}'
         model_name = basename(model_path)[:-4]
-
+        
         model_ft = torch.load(model_path)
         model = model_ft['model'].to(device)
         arc_margin = model_ft['arccos'].to(device)

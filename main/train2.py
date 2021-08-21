@@ -11,13 +11,14 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from dataset import dataloader
-from densenet import densenet121, densenet201
+from balance_dataloader import BalancedBatchSampler
+from densenet import densenet121, densenet201, densenet161
 from preprocess import preproc
 from ArcMarginModel import ArcMarginModel
 from FocalLoss import FocalLoss
+import torchvision.models as models
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -52,12 +53,11 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
     ######################
 
 
-def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1, tolerance = 5):
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1):
 
     since = time.time()
     lowest_val_loss = 100.0
     arc_decay = []
-
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
@@ -76,6 +76,10 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
                     dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+                balanced_batch_sampler = BalancedBatchSampler(training, training_csv, 4, batch_size)
+                batch_iterator = iter(DataLoader(
+                    dataloaders[phase], batch_sampler=balanced_batch_sampler, num_workers=20))
+
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
@@ -139,8 +143,8 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                     count+=1
                 else:
                     lowest_train_loss = epoch_loss
-#                 if count==tolerance:
-                if epoch==40:
+                    
+                if epoch in [40]:
 #                     print(arc_margin.s, arc_margin.m, arc_margin.cos_m, arc_margin.sin_m, arc_margin.th, arc_margin.mm)
                     arc_margin.m*=alpha
                     count=0
@@ -182,7 +186,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
     if arccos is None:
         torch.save(best_model, f'./weights/{model_name}_epoch{best_epoch}.pth')
     else:
-        torch.save({'model': best_model, 'arccos': best_arc_margin,
+        torch.save({'model': best_model, 'arccos': best_arc_margin, 'batch_size': batch_size,
                     'optimizer': optimizer, 'arc_decay': arc_decay}, f'./weights/{model_name}_epoch{best_epoch}.tar')
     return model
 
@@ -191,22 +195,27 @@ if __name__ == "__main__":
     now = datetime.now()
     arccos = True
     if arccos:
-        model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
+        model_name = f'resnet50_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
     else:
         model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
 
-    model_ft = densenet121(pretrained=True)
-    num_ftrs = model_ft.classifier.in_features
+    model_ft = models.resnet50(pretrained=True)
+#     import pdb;pdb.set_trace()
+#     num_ftrs = model_ft.classifier[1].in_features # mbnetv2
+    num_ftrs = model_ft.fc.in_features # resnet50
 
     if arccos:
-        model_ft.classifier = nn.Sequential(
+#         model_ft.classifier = nn.Sequential(
+#             nn.Linear(num_ftrs, 512), nn.ReLU())
+        model_ft.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512), nn.ReLU())
         model_ft = model_ft.to(device)
         arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
         criterion = nn.CrossEntropyLoss()
+        
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
                                  'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.01, momentum=0.9)
     else:
@@ -222,6 +231,6 @@ if __name__ == "__main__":
 #     exp_lr_scheduler = lr_scheduler.StepLR(
 #         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[20, 30], gamma=0.1)
+        optimizer_ft, milestones=[20,30], gamma=0.1)
 #     exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100, alpha = 1.3, tolerance = 5)
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=15, alpha = 1)
