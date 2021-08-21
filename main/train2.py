@@ -55,7 +55,6 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
 def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1, tolerance = 5):
 
     since = time.time()
-    best_model_wts = copy.deepcopy(model.state_dict())
     lowest_val_loss = 100.0
     arc_decay = []
 

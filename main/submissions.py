@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/efficientnet_b2_ArcMargin_2021-06-18_17-57_epoch60.tar'
+model_path = './weights/efficientnet_b2_ArcMargin_2021-08-07_23-34_epoch68.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
