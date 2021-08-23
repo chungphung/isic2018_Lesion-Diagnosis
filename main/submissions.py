@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from ArcMarginModel import ArcMarginModel
+# from ArcMarginModel import ArcMarginModel
 from dataset import dataloader
 from preprocess import preproc
 
@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/efficientnet_b2_ArcMargin_2021-08-07_23-34_epoch68.tar'
+model_path = './weights/densenet121_ArcMargin_2021-08-22_19-26_epoch99.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -30,15 +30,7 @@ test_loader = dataloader(None, test_data, preproc(), 'test')
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def full_crop(image):
-    img_t = []
-    for r in range(0, 4):
-        for c in range(0, 5):
-            img_t.append(image[:, 50*r:50*r+300, 50*c:50*c+400])
-    return img_t
-
-
-def summision_generate(model, batch_size, arccos=None, voting=True):
+def summision_generate(model, batch_size, arccos):
 
     result = {}
     since = time.time()
@@ -53,9 +45,6 @@ def summision_generate(model, batch_size, arccos=None, voting=True):
     iteration = int(len(test_loader)/batch_size)
     for step in tqdm(range(iteration), desc="Running..."):
         images, labels = next(batch_iterator)
-        if voting:
-            img_t = full_crop(images[0].numpy())
-            images = torch.tensor(img_t)
 
         images = images.to(device)
 
@@ -63,17 +52,9 @@ def summision_generate(model, batch_size, arccos=None, voting=True):
         with torch.set_grad_enabled(False):
             outputs = model(images)
             if arccos != None:
-                outputs = arc_margin(outputs, labels, phase='test')
+                outputs = arc_margin(outputs, None, labels, phase='test')
             preds = torch.softmax(outputs, dim=1)
             onehot = np.eye(7)[torch.argmax(preds.cpu(), dim=1)]
-
-            if voting:
-                vote_onehot = onehot.copy()
-                onehot = []
-                for i in range(batch_size):
-                    onehot.append(
-                        np.eye(7)[np.argmax(sum(vote_onehot[i*20:(i+1)*20]))])
-                onehot = np.array(onehot)
 
         for i in range(batch_size):
             if 'image' not in result.keys():
@@ -93,12 +74,8 @@ def summision_generate(model, batch_size, arccos=None, voting=True):
         df[k] = result[k]
 
     # saving the dataframe
-    if voting:
-        df.to_csv(
-            f'./submissions/voting_{basename(model_path)[:-4]}.csv', index=False)
-    else:
-        df.to_csv(
-            f'./submissions/{basename(model_path)[:-4]}.csv', index=False)
+    df.to_csv(
+        f'./submissions/{basename(model_path)[:-4]}.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(
@@ -106,13 +83,7 @@ def summision_generate(model, batch_size, arccos=None, voting=True):
 
 
 if __name__ == "__main__":
-    arccos = True
-    if arccos:
-        model_ft = torch.load(model_path)
-        model = model_ft['model'].to(device)
-        arc_margin = model_ft['arccos'].to(device)
-    else:
-        model = torch.load(model_path)
-        model = model.to(device)
-        arc_margin = None
-    summision_generate(model, batch_size=12, arccos=arc_margin, voting=False)
+    model_ft = torch.load(model_path)
+    model = model_ft['model'].to(device)
+    arc_margin = model_ft['arccos'].to(device)
+    summision_generate(model, batch_size=12, arccos=arc_margin)

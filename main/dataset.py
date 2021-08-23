@@ -2,7 +2,6 @@ from os import listdir
 from os.path import join
 
 import cv2
-import numpy as np
 import pandas as pd
 import torch
 import torch.utils.data as data

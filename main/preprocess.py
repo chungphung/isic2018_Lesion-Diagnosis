@@ -9,16 +9,16 @@ import torch
 def _random_crop(image):
     r = random.randint(0, 3)
     c = random.randint(0, 4)
-#     img_t = image[25*r:25*r+350, 25*c:25*c+450]
+    img_t = image[25*r:25*r+350, 25*c:25*c+450]
 #     img_t = image[25*r:25*r+224, 25*c:25*c+224]
-    img_t = image[:, 25*c:25*c+450]
+    # img_t = image[:, 25*c:25*c+450]
     return img_t
 
 
 def _center_crop(image):
-#     img_t = image[50:400, 75:525]
+    img_t = image[50:400, 75:525]
 #     img_t = image[113:337, 188:412]
-    img_t = image[:, 75:525]
+    # img_t = image[:, 75:525]
     return img_t
 
 

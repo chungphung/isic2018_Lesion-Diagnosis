@@ -4,9 +4,6 @@ from collections import OrderedDict
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.nn import (AdaptiveAvgPool2d, AvgPool2d, BatchNorm1d, BatchNorm2d,
-                      Conv2d, Dropout, Dropout2d, Linear, MaxPool2d, Module,
-                      Parameter, PReLU, ReLU, Sequential, Sigmoid)
 
 
 class ArcMarginModel(nn.Module):
@@ -16,7 +13,7 @@ class ArcMarginModel(nn.Module):
         emb_size = 512
         num_classes = 7
         self.device = device
-        self.weight = Parameter(torch.FloatTensor(num_classes, emb_size))
+        self.weight = nn.Parameter(torch.FloatTensor(num_classes, emb_size))
         nn.init.xavier_uniform_(self.weight)
 
         self.easy_margin = False
@@ -97,8 +94,8 @@ class BasicCNN(nn.Module):
 
 
 class ArcMarginModel_AutoMargin(nn.Module):
-    def __init__(self, device, s=30.0):
-        super(ArcMarginModel, self).__init__()
+    def __init__(self, device, m, s=30.0):
+        super(ArcMarginModel_AutoMargin, self).__init__()
 
         self.features = nn.Sequential(OrderedDict([
             ('conv0', nn.Conv2d(3, 64, kernel_size=7, stride=2,
@@ -126,7 +123,7 @@ class ArcMarginModel_AutoMargin(nn.Module):
         emb_size = 512
         num_classes = 7
         self.device = device
-        self.weight = Parameter(torch.FloatTensor(num_classes, emb_size))
+        self.weight = nn.Parameter(torch.FloatTensor(num_classes, emb_size))
         nn.init.xavier_uniform_(self.weight)
 
         self.m = m
@@ -136,7 +133,7 @@ class ArcMarginModel_AutoMargin(nn.Module):
         self.th = math.cos(math.pi - self.m)
         self.mm = math.sin(math.pi - self.m) * self.m
 
-    def forward(self, vector, x, label, phase='train'):
+    def forward(self, vector, image, label, phase='train'):
         x = F.normalize(vector)
         W = F.normalize(self.weight)
         cosine = F.linear(x, W)
@@ -144,11 +141,11 @@ class ArcMarginModel_AutoMargin(nn.Module):
         if phase == 'train':
             
             # calculate margin 
-            features = self.features(x)
+            features = self.features(image)
             feature_out = F.relu(features, inplace=True)
             feature_out = F.adaptive_avg_pool2d(feature_out, (1, 1))
             feature_out = torch.flatten(feature_out, 1)
-            self.m = self.classifier(feature_out)
+            self.m = torch.abs(torch.mean(self.classifier(feature_out)))
             ##################
 
             self.cos_m = math.cos(self.m)
@@ -157,10 +154,7 @@ class ArcMarginModel_AutoMargin(nn.Module):
             self.mm = math.sin(math.pi - self.m) * self.m
 
             phi = cosine * self.cos_m - sine * self.sin_m  # cos(theta + m)
-            if self.easy_margin:
-                phi = torch.where(cosine > 0, phi, cosine)
-            else:
-                phi = torch.where(cosine > self.th, phi, cosine - self.mm)
+            phi = torch.where(cosine > self.th, phi, cosine - self.mm)
             one_hot = torch.zeros(cosine.size(), device=self.device)
             one_hot.scatter_(1, label.view(-1, 1).long(), 1)
             output = (one_hot * phi) + ((1.0 - one_hot) * cosine)
@@ -172,29 +166,29 @@ class ArcMarginModel_AutoMargin(nn.Module):
 
 
 
-from preprocess import preproc
-from torch.utils.data import DataLoader
-from dataset import dataloader
-def main():
-    training_csv = './main/train.csv'
-    data = '../../data/ISIC2018_Task3_Training_Input'
-    training = dataloader(training_csv, data, preproc(), 'training')
-    batch_iterator = iter(DataLoader(
-                    training, 1, shuffle=True, num_workers=0))
-    iteration = int(len(training)/1)
-    model = BasicCNN()
-    model.train() 
-    model = model.to("cuda:0")
+# from preprocess import preproc
+# from torch.utils.data import DataLoader
+# from dataset import dataloader
+# def main():
+#     training_csv = './main/train.csv'
+#     data = '../../data/ISIC2018_Task3_Training_Input'
+#     training = dataloader(training_csv, data, preproc(), 'training')
+#     batch_iterator = iter(DataLoader(
+#                     training, 1, shuffle=True, num_workers=0))
+#     iteration = int(len(training)/1)
+#     model = BasicCNN()
+#     model.train() 
+#     model = model.to("cuda:0")
             
-    for step in range(iteration):
-        images, labels = next(batch_iterator)
-        images = images.to("cuda:0")
-        # forward
-        # track history if only in train
-        with torch.set_grad_enabled(True):
-            outputs = model(images)
+#     for step in range(iteration):
+#         images, labels = next(batch_iterator)
+#         images = images.to("cuda:0")
+#         # forward
+#         # track history if only in train
+#         with torch.set_grad_enabled(True):
+#             model(images)
         
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
