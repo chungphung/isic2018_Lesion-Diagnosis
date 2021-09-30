@@ -203,8 +203,9 @@ if __name__ == "__main__":
     writer = SummaryWriter(f'runs/{model_name}')
 
     # model_ft = densenet121(pretrained=True)
-    model_ft = timm.create_model(
-        'efficientnet_b2', pretrained=True, num_classes=512)
+    # model_ft = timm.create_model(
+    #     'efficientnet_b2', pretrained=True, num_classes=512)
+    model = timm.create_model('vit_base_patch16_224', pretrained=True)
 
     num_ftrs = model_ft.classifier.in_features
 

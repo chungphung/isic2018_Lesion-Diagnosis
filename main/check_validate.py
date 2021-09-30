@@ -17,9 +17,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 validate_csv = './main/val.csv'
-data = './data/ISIC2018_Task3_Training_Input'
+data = '../../data/ISIC2018_Task3_Training_Input'
 
-models = os.listdir('./weights')
+models = os.listdir('./weights_test')
 
 scores = models
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
@@ -49,7 +49,7 @@ def check(model, model_name, score, batch_size):
 
     model.eval()   # Set model to evaluate mode
     batch_iterator = iter(DataLoader(
-        validation, batch_size, shuffle=False, num_workers=20))
+        validation, batch_size, shuffle=False, num_workers=4))
     y_true = []
     y_pred = []
     # for images, labels in validation:
@@ -63,6 +63,7 @@ def check(model, model_name, score, batch_size):
         # run predictions
         with torch.set_grad_enabled(False):
             outputs = model(images)
+            # outputs = arc_margin(outputs, None, labels, phase='test')
             outputs = arc_margin(outputs, labels, phase='test')
             onehot = torch.argmax(outputs.cpu(), dim=1).tolist()
 
@@ -75,11 +76,11 @@ if __name__ == "__main__":
         if '.ipynb_checkpoints' in m:
             continue
         print(m)
-        model_path = f'./weights/{m}'
+        model_path = f'./weights_test/{m}'
         model_name = basename(model_path)[:-4]
         
         model_ft = torch.load(model_path)
         model = model_ft['model'].to(device)
         arc_margin = model_ft['arccos'].to(device)
 
-        check(model, model_name, s, batch_size=12)
+        check(model, model_name, s, batch_size=8)

@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/densenet121_ArcMargin_2021-08-22_19-26_epoch99.tar'
+model_path = './weights/densenet121_ArcMargin_2021-09-26_20-56_epoch22.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -52,7 +52,8 @@ def summision_generate(model, batch_size, arccos):
         with torch.set_grad_enabled(False):
             outputs = model(images)
             if arccos != None:
-                outputs = arc_margin(outputs, None, labels, phase='test')
+                # outputs = arc_margin(outputs, None, labels, phase='test')
+                outputs = arc_margin(outputs, labels, phase='test')
             preds = torch.softmax(outputs, dim=1)
             onehot = np.eye(7)[torch.argmax(preds.cpu(), dim=1)]
 

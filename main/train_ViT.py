@@ -16,16 +16,16 @@ from dataset import dataloader
 from balance_dataloader import BalancedBatchSampler
 from densenet import densenet121, densenet201, densenet161
 from preprocess import preproc
-from ArcMarginModel import ArcMarginModel_AutoMargin
+from ArcMarginModel import ArcMarginModel
 from FocalLoss import FocalLoss
-import torchvision.models as models
+import timm
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 training_csv = './main/train.csv'
 validate_csv = './main/val.csv'
-data = '../../data/ISIC2018_Task3_Training_Input'
+data = './data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, preproc(), 'training')
@@ -74,7 +74,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=4))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=8))
                 # balanced_batch_sampler = BalancedBatchSampler(training, training_csv, 4, batch_size)
                 # batch_iterator = iter(DataLoader(
                 #     dataloaders[phase], batch_sampler=balanced_batch_sampler, num_workers=20))
@@ -82,7 +82,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=False, num_workers=4))
+                    dataloaders[phase], batch_size, shuffle=False, num_workers=8))
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
@@ -176,55 +176,38 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
     return model
 
 
-def separate_resnet_bn_paras(modules):
-    all_parameters = modules.parameters()
-    paras_only_bn = []
-
-    for pname, p in modules.named_parameters():
-        if pname.find('norm') >= 0:
-            paras_only_bn.append(p)
-            
-    paras_only_bn_id = list(map(id, paras_only_bn))
-    paras_wo_bn = list(filter(lambda p: id(p) not in paras_only_bn_id, all_parameters))
-    
-    return paras_only_bn, paras_wo_bn
-
-
 if __name__ == "__main__":
+    
+    cont = False
+    
     now = datetime.now()
-    model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
+    model_name = f'ViT_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
-
-    model_ft = models.densenet121(pretrained=True)
-    num_ftrs = model_ft.classifier.in_features
-    # num_ftrs = model_ft.fc.in_features # resnet50
-
-    model_ft.classifier = nn.Sequential(
-        nn.Linear(num_ftrs, 512), nn.ReLU())
-    # model_ft.fc = nn.Sequential(
-    #     nn.Linear(num_ftrs, 512), nn.ReLU())
-    model_ft = model_ft.to(device)
-    arc_margin = ArcMarginModel_AutoMargin(device, m=0.1, s=5.0).to(device)
     
-    backbone_paras_only_bn, backbone_paras_wo_bn = separate_resnet_bn_paras(model_ft) # separate batch_norm parameters from others; do not do weight decay for batch_norm parameters to improve the generalizability
-    _, head_paras_wo_bn = separate_resnet_bn_paras(arc_margin)
-    
+    if not cont:
+        model_ft = timm.create_model(
+        'vit_base_patch16_224', pretrained=True)
+        num_ftrs = model_ft.head.in_features
+
+        model_ft.head = nn.Sequential(nn.Dropout(0.2),
+            nn.Linear(num_ftrs, 512), nn.ReLU())
+        model_ft = model_ft.to(device)
+        arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
+    else:
+        model = torch.load('./weights/efficientnet_b2_ArcMargin_2021-09-25_20-27_epoch30.tar')
+        model_ft = model['model'].to(device)
+        arc_margin = model['arccos'].to(device)
     criterion = nn.CrossEntropyLoss()
+#     criterion = FocalLoss()
     
-    # optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
-    #                             'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.01, momentum=0.9)
-
-    optimizer_ft = optim.SGD([{'params': backbone_paras_wo_bn + head_paras_wo_bn, 'weight_decay': 1e-3}, {'params': backbone_paras_only_bn}], lr = 0.01, momentum = 0.9)
+    optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
+                                'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.001, momentum=0.9)
 
 
     # Observe that all parameters are being optimized
-
-    # Decay LR by a factor of 0.1 every 7 epochs
-#     exp_lr_scheduler = lr_scheduler.StepLR(
-#         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[20,30], gamma=0.1)
-#     exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=8, num_epochs=100)
+        optimizer_ft, milestones=[25,40], gamma=0.1)
+    
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=32, num_epochs=100)

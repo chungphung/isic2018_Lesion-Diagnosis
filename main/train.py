@@ -11,24 +11,25 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from dataset import dataloader
-from densenet import densenet121, densenet201
+from densenet import densenet121, densenet201, densenet161
 from preprocess import preproc
 from ArcMarginModel import ArcMarginModel
 from FocalLoss import FocalLoss
+from random import random, randrange, seed
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-training_csv = './main/train.csv'
-validate_csv = './main/val.csv'
-data = '../../data/ISIC2018_Task3_Training_Input'
+training_csv = './data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
+validate_csv = './data/ISIC2018_Task3_Validation_GroundTruth/ISIC2018_Task3_Validation_GroundTruth.csv'
+data = './data/ISIC2018_Task3_Training_Input'
+val = './data/ISIC2018_Task3_Validation_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, preproc(), 'training')
-validation = dataloader(validate_csv, data, preproc(), 'validate')
+validation = dataloader(validate_csv, val, preproc(), 'validate')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -45,19 +46,20 @@ def visualizing(phase, epoch, step, epoch_loss, epoch_acc):
         writer.add_scalar(f'{phase} loss',
                           epoch_loss,
                           epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
+
         writer.add_scalar(f'{phase} accuracy',
                           epoch_acc,
                           epoch * len(dataloaders[phase]) + len(dataloaders[phase]))
     ######################
 
 
-def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, writer, model_name, batch_size, arccos=None, num_epochs=25, alpha=0.1):
 
     since = time.time()
-    best_model_wts = copy.deepcopy(model.state_dict())
     lowest_val_loss = 100.0
-
+    arc_decay = []
     for epoch in range(num_epochs):
+        
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
@@ -66,12 +68,16 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         train_correct = 0
         val_correct = 0
         # Each epoch has a training and validation phase
+        count = 0
+        lowest_train_loss = 9999
+        
         for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=2))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+
             else:
                 model.eval()   # Set model to evaluate mode
                 batch_iterator = iter(DataLoader(
@@ -79,7 +85,9 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
+            
             for step in range(iteration):
+                seed(randrange(10)*random())
                 images, labels = next(batch_iterator)
                 images = images.to(device)
                 labels = labels.squeeze(1)
@@ -120,19 +128,30 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                     val_correct += torch.sum(preds == labels.data)
                     print(
                         f'epoch {epoch} - step {step}/{iteration} - ValidateLoss {loss}')
+                del loss
+                del outputs
 
             if phase == 'train':
                 if scheduler is not None:
                     scheduler.step()
+                
+
             if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
-                import pdb
-                pdb.set_trace()
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
+                
+                if lowest_train_loss <= epoch_loss:
+                    count+=1
+                else:
+                    lowest_train_loss = epoch_loss
+                if epoch in [40]:
+                    arc_margin.m*=alpha
+                    count=0
+                    arc_decay.append(epoch)
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])
                 epoch_acc = val_correct.double() / len(dataloaders[phase])
-
+            
             # training visualizing
             visualizing(phase, epoch, step, epoch_loss, epoch_acc)
             ######################
@@ -153,7 +172,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if arccos is None:
                 torch.save(model, f'./weights/{model_name}_epoch{epoch}.pth')
             else:
-                torch.save({'model': model, 'arccos': arc_margin, 'optimizer': optimizer},
+                torch.save({'model': model, 'arccos': arc_margin, 'optimizer': optimizer, 'arc_decay': arc_decay},
                            f'./weights/{model_name}_epoch{epoch}.tar')
 
         time_elapsed = time.time() - since
@@ -166,18 +185,16 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
     if arccos is None:
         torch.save(best_model, f'./weights/{model_name}_epoch{best_epoch}.pth')
     else:
-        torch.save({'model': best_model, 'arccos': best_arc_margin,
-                    'optimizer': optimizer}, f'./weights/{model_name}_epoch{best_epoch}.tar')
+        torch.save({'model': best_model, 'arccos': best_arc_margin, 'batch_size': batch_size,
+                    'optimizer': optimizer, 'arc_decay': arc_decay}, f'./weights/{model_name}_epoch{best_epoch}.tar')
     return model
 
 
 if __name__ == "__main__":
     now = datetime.now()
     arccos = True
-    if arccos:
-        model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
-    else:
-        model_name = f'densenet121_AutoWtdCE_{now.date()}_{now.hour}-{now.minute}'
+    
+    model_name = f'densenet121_ArcMargin_{now.date()}_{now.hour}-{now.minute}'
 
     # default `log_dir` is "runs" - we'll be more specific here
     writer = SummaryWriter(f'runs/{model_name}')
@@ -189,10 +206,11 @@ if __name__ == "__main__":
         model_ft.classifier = nn.Sequential(
             nn.Linear(num_ftrs, 512), nn.ReLU())
         model_ft = model_ft.to(device)
-        arc_margin = ArcMarginModel(device, m=0.1, s=3.0).to(device)
+        arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
         criterion = nn.CrossEntropyLoss()
+        
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
-                                 'params': arc_margin.parameters()}], lr=0.01, momentum=0.9)
+                                 'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.01, momentum=0.9)
     else:
         model_ft.classifier = nn.Linear(num_ftrs, 7)
         model_ft = model_ft.to(device)
@@ -200,13 +218,7 @@ if __name__ == "__main__":
         optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
         arccos = None
 
-    # Observe that all parameters are being optimized
-
-    # Decay LR by a factor of 0.1 every 7 epochs
-#     exp_lr_scheduler = lr_scheduler.StepLR(
-#         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[43], gamma=0.1)
-#     exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft,
-                           exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100)
+        optimizer_ft, milestones=[20,30], gamma=0.1)
+    
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=32, arccos=arccos, num_epochs=100, alpha = 1)
