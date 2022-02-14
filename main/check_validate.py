@@ -13,9 +13,11 @@ from preprocess import preproc
 import seaborn as sn
 import pandas as pd
 import numpy as np
+import timm
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
+# validate_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
 validate_csv = './main/val.csv'
 data = '../../data/ISIC2018_Task3_Training_Input'
 
@@ -39,6 +41,7 @@ def _confusion_matrix(model_name, score, y_true, y_pred):
     plt.figure(figsize = (10,7))
     sns_plot = sn.heatmap(df_cm, annot=True, square=True, cmap="YlGnBu").set_title(f'Score: {score}')
     fig = sns_plot.get_figure()
+    # fig.savefig(f"./confusion_matrix/full_data/{model_name}.png", dpi=400)
     fig.savefig(f"./confusion_matrix/{model_name}.png", dpi=400)
 
 def check(model, model_name, score, batch_size):

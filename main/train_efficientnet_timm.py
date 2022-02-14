@@ -14,7 +14,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset import dataloader
 from balance_dataloader import BalancedBatchSampler
-from preprocess import preproc
+from preprocess import preproc, randaugment_preproc
+
 from ArcMarginModel import ArcMarginModel
 from FocalLoss import FocalLoss
 import timm
@@ -27,8 +28,8 @@ validate_csv = './main/val.csv'
 data = './data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, data, preproc(), 'training')
-validation = dataloader(validate_csv, data, preproc(), 'validate')
+training = dataloader(training_csv, data, randaugment_preproc(), 'training')
+validation = dataloader(validate_csv, data, randaugment_preproc(), 'validate')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -230,6 +231,6 @@ if __name__ == "__main__":
 #     exp_lr_scheduler = lr_scheduler.StepLR(
 #         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[20, 30], gamma=0.1)
+        optimizer_ft, milestones=[20, 30], gamma=0.01)
 #     exp_lr_scheduler = None
     model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=14, arccos=arccos, num_epochs=100, alpha = 0.1)

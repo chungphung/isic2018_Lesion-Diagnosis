@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/densenet121_ArcMargin_2021-09-26_20-56_epoch22.tar'
+model_path = './weights/efficientnet_b2_ArcMargin_2021-06-17_18-11_epoch80.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -76,7 +76,7 @@ def summision_generate(model, batch_size, arccos):
 
     # saving the dataframe
     df.to_csv(
-        f'./submissions/{basename(model_path)[:-4]}.csv', index=False)
+        f'./{basename(model_path)[:-4]}.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(
@@ -86,5 +86,7 @@ def summision_generate(model, batch_size, arccos):
 if __name__ == "__main__":
     model_ft = torch.load(model_path)
     model = model_ft['model'].to(device)
+    import torch.nn as nn 
+    model.global_pool.flatten = nn.Flatten(1)
     arc_margin = model_ft['arccos'].to(device)
     summision_generate(model, batch_size=12, arccos=arc_margin)
