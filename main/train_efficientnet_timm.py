@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset import dataloader
 from balance_dataloader import BalancedBatchSampler
-from preprocess import preproc, randaugment_preproc
+from preprocess import preproc, lowcost_center_preproc
 
 from ArcMarginModel import ArcMarginModel
 from FocalLoss import FocalLoss
@@ -25,11 +25,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 training_csv = './main/train.csv'
 validate_csv = './main/val.csv'
-data = './data/ISIC2018_Task3_Training_Input'
+data = './ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
-training = dataloader(training_csv, data, randaugment_preproc(), 'training')
-validation = dataloader(validate_csv, data, randaugment_preproc(), 'validate')
+training = dataloader(training_csv, data, lowcost_center_preproc(), 'training')
+validation = dataloader(validate_csv, data, lowcost_center_preproc(), 'validate')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -58,7 +58,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
     lowest_val_loss = 100.0
     arc_decay = []
     for epoch in range(num_epochs):
-        
+
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
@@ -69,16 +69,19 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
         # Each epoch has a training and validation phase
         count = 0
         lowest_train_loss = 9999
-        
+
         for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()  # Set model to training mode
                 # Iterate over data.
-#                 batch_iterator = iter(DataLoader(
-#                     dataloaders[phase], batch_size, shuffle=True, num_workers=20))
-                balanced_batch_sampler = BalancedBatchSampler(training, training_csv, 7, batch_size)
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_sampler=balanced_batch_sampler, num_workers=20))
+                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+                # balanced_batch_sampler = BalancedBatchSampler(
+                #     training, training_csv, 7, batch_size)
+                # batch_iterator = iter(DataLoader(
+                #     dataloaders[phase],
+                #     batch_sampler=balanced_batch_sampler, 
+                #     num_workers=20))
 
             else:
                 model.eval()   # Set model to evaluate mode
@@ -87,7 +90,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
 
             # for images, labels in dataloaders[phase]:
             iteration = int(len(dataloaders[phase])/batch_size)
-            
+
             for step in range(iteration):
                 images, labels = next(batch_iterator)
                 images = images.to(device)
@@ -135,25 +138,24 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
             if phase == 'train':
                 if scheduler is not None:
                     scheduler.step()
-                
 
             if phase == 'train':
                 epoch_loss = train_loss / len(dataloaders[phase])
                 epoch_acc = train_correct.double() / len(dataloaders[phase])
-                
+
                 if lowest_train_loss <= epoch_loss:
-                    count+=1
+                    count += 1
                 else:
                     lowest_train_loss = epoch_loss
                 if epoch in [40]:
-#                     print(arc_margin.s, arc_margin.m, arc_margin.cos_m, arc_margin.sin_m, arc_margin.th, arc_margin.mm)
-                    arc_margin.m*=alpha
-                    count=0
+                    #                     print(arc_margin.s, arc_margin.m, arc_margin.cos_m, arc_margin.sin_m, arc_margin.th, arc_margin.mm)
+                    arc_margin.m *= alpha
+                    count = 0
                     arc_decay.append(epoch)
             else:
                 epoch_loss = val_loss / len(dataloaders[phase])
                 epoch_acc = val_correct.double() / len(dataloaders[phase])
-            
+
             # training visualizing
             visualizing(phase, epoch, step, epoch_loss, epoch_acc)
             ######################
@@ -204,15 +206,15 @@ if __name__ == "__main__":
     writer = SummaryWriter(f'runs/{model_name}')
 
     # model_ft = densenet121(pretrained=True)
-    # model_ft = timm.create_model(
-    #     'efficientnet_b2', pretrained=True, num_classes=512)
-    model = timm.create_model('vit_base_patch16_224', pretrained=True)
+    model_ft = timm.create_model(
+        'efficientnet_b2', pretrained=True, num_classes=512)
+    # model = timm.create_model('vit_base_patch16_224', pretrained=True)
 
     num_ftrs = model_ft.classifier.in_features
 
     if arccos:
         model_ft.classifier = nn.Sequential(nn.Dropout(0.2),
-            nn.Linear(num_ftrs, 512), nn.ReLU())
+                                            nn.Linear(num_ftrs, 512), nn.ReLU())
         model_ft = model_ft.to(device)
         arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
         criterion = nn.CrossEntropyLoss()
@@ -233,4 +235,5 @@ if __name__ == "__main__":
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
         optimizer_ft, milestones=[20, 30], gamma=0.01)
 #     exp_lr_scheduler = None
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, writer, model_name, batch_size=14, arccos=arccos, num_epochs=100, alpha = 0.1)
+    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+                           writer, model_name, batch_size=32, arccos=arccos, num_epochs=100, alpha=0.1)

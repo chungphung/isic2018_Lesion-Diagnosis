@@ -4,8 +4,13 @@ import cv2
 import imutils
 import numpy as np
 import torch
-from torchvision.transforms import RandAugment
+from torchvision.transforms import RandAugment, RandomCrop, CenterCrop
 
+from AutoAugment.autoaugment import AutoAugment, AutoAugmentPolicy
+
+lowcost = AutoAugment(AutoAugmentPolicy.LCA)
+cropper = RandomCrop(size=(224, 224))
+center = CenterCrop(size=(224, 224))
 def _random_crop(image):
     r = random.randint(0, 3)
     c = random.randint(0, 4)
@@ -74,7 +79,7 @@ class preproc(object):
             image_t = (image_t/255.0).astype(np.float32)
         else:
             labels = [targets]
-            image = _center_crop(image)
+            # image = _center_crop(image)
             image_t = (image/255.0).astype(np.float32)
         return image_t, labels
 
@@ -100,5 +105,51 @@ class randaugment_preproc(object):
         else:
             labels = [targets]
             image = _center_crop(image)
+            image_t = (image/255.0).astype(np.float32)
+        return image_t, labels
+    
+class lowcost_center_preproc(object):
+
+    def __init__(self):
+        self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
+
+    def __call__(self, image, targets, phase, image2):
+        if phase == 'training' or phase == 'validate':
+            labels = torch.tensor(
+                np.array([self.labels_names.index(targets)]), dtype=torch.long)
+            if phase == 'training':
+                image_t = lowcost(image, image2)
+                image_t = np.array(cropper(image_t), dtype=np.uint8)
+                    
+            else:  # validate will go here!!!
+                image_t = np.array(center(image), dtype=np.uint8)
+            image_t = (image_t/255.0).astype(np.float32)
+        else:
+            labels = [targets]
+            image = image_t = np.array(center(image), dtype=np.uint8)
+            image_t = (image/255.0).astype(np.float32)
+        return image_t, labels
+    
+
+class lowcost_16crop_preproc(object):
+
+    def __init__(self):
+        self.labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
+
+    def __call__(self, image, targets, phase, image2):
+        if phase == 'training' or phase == 'validate':
+            labels = torch.tensor(
+                np.array([self.labels_names.index(targets)]), dtype=torch.long)
+            if phase == 'training':
+                image_t = lowcost(image, image2)
+                image_t = np.array(cropper(image_t), dtype=np.uint8)
+                    
+            else:  # validate will go here!!!
+                # image_t = np.array(center(image), dtype=np.uint8)
+                pass
+            image_t = (image_t/255.0).astype(np.float32)
+        else:
+            labels = [targets]
+            # image = image_t = np.array(center(image), dtype=np.uint8)
             image_t = (image/255.0).astype(np.float32)
         return image_t, labels

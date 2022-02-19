@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # from ArcMarginModel import ArcMarginModel
 from dataset import dataloader
-from preprocess import preproc
+from preprocess import preproc, randaugment_preproc
 
 import warnings
 from torch.serialization import SourceChangeWarning
@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 test_data = '../../data/ISIC2018_Task3_Test_Input'
-model_path = './weights/efficientnet_b2_ArcMargin_2021-06-17_18-11_epoch80.tar'
+model_path = './weights/efficientnet_b2_ArcMargin_2022-02-15_3-35_epoch84.tar'
 
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
@@ -76,7 +76,7 @@ def summision_generate(model, batch_size, arccos):
 
     # saving the dataframe
     df.to_csv(
-        f'./{basename(model_path)[:-4]}.csv', index=False)
+        f'./submissions/{basename(model_path)[:-4]}_nocentercrop.csv', index=False)
 
     time_elapsed = time.time() - since
     print('Runnning complete in {:.0f}m {:.0f}s'.format(
