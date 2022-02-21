@@ -5,7 +5,7 @@ import cv2
 import pandas as pd
 import torch
 import torch.utils.data as data
-
+from PIL import Image
 
 class dataloader(data.Dataset):
     def __init__(self, txt_path, data_path, preproc=None, mode='training'):
@@ -39,10 +39,14 @@ class dataloader(data.Dataset):
 
     def __getitem__(self, index):
         img = cv2.imread(self.imgs_path[index])
+        img = Image.fromarray(img)
+        scd_index = int(torch.randint(1, len(self.imgs_path), (1,)))
+        img2 = cv2.imread(self.imgs_path[scd_index if scd_index!=index else scd_index-1])
+        img2 = Image.fromarray(img2)
         if self.mode == 'training' or self.mode == 'validate':
             label = self.labels[index]
-            img, target = self.preproc(img, label, self.mode)
+            img, target = self.preproc(img, label, self.mode, img2)
         else:
             target = self.imgs_path[index]
-            img, target = self.preproc(img, target, self.mode)
+            img, target = self.preproc(img, target, self.mode, img2)
         return torch.from_numpy(img.transpose(2, 0, 1)), target

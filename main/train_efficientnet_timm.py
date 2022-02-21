@@ -219,7 +219,7 @@ if __name__ == "__main__":
         arc_margin = ArcMarginModel(device, m=0.1, s=5.0).to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer_ft = optim.SGD([{'params': model_ft.parameters()}, {
-                                 'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.01, momentum=0.9)
+                                 'params': arc_margin.parameters(), 'weight_decay': 1e-3}], lr=0.001, momentum=0.9)
     else:
         model_ft.classifier = nn.Linear(num_ftrs, 7)
         model_ft = model_ft.to(device)
@@ -233,7 +233,7 @@ if __name__ == "__main__":
 #     exp_lr_scheduler = lr_scheduler.StepLR(
 #         optimizer_ft, step_size=10, gamma=0.1)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(
-        optimizer_ft, milestones=[20, 30], gamma=0.01)
+        optimizer_ft, milestones=[20, 30, 40, 50, 60, 70], gamma=0.1)
 #     exp_lr_scheduler = None
     model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                            writer, model_name, batch_size=32, arccos=arccos, num_epochs=100, alpha=0.1)

@@ -6,7 +6,7 @@ from torch import Tensor
 from typing import List, Tuple, Optional, Dict
 import cv2
 import numpy as np
-
+from PIL import Image
 from torchvision.transforms import functional as F, InterpolationMode
 
 __all__ = ["AutoAugmentPolicy", "AutoAugment", "RandAugment", "TrivialAugmentWide"]
@@ -64,21 +64,33 @@ def _apply_op(img: Tensor, op_name: str, magnitude: float,
         if torch.rand(1) < 0.5:
             img = F.vflip(img)
     elif op_name == "Cutout":
-        x = torch.randint(0,224-magnitude,1)
-        y = torch.randint(0,224-magnitude,1)
-        img[y:y+magnitude, x:x+magnitude] = 124
+        x = int(torch.randint(0,int(224-magnitude),(1,)))
+        y = int(torch.randint(0,int(224-magnitude),(1,)))
+        # import pdb;pdb.set_trace()
+        img = np.array(img, dtype=np.uint8)
+        img[y:y+int(magnitude), x:x+int(magnitude)] = 124
+        img = Image.fromarray(img)
     elif op_name == "Colorshift":
-        img = img+magnitude
+        img = np.asarray(img)
+        img = np.array(img+magnitude, dtype=np.uint8)
+        img = Image.fromarray(img)
     elif op_name == "Scale":
-        h,w,c = img.shape
+        w, h = img.size
+        # print(w,h,magnitude)
         img = F.resize(img, [int(h*magnitude), int(w*magnitude)])
     elif op_name == "EqualizeYUV":
         img = cv2.cvtColor(np.array(img), cv2.COLOR_BGR2YUV)
         img = F.equalize(torch.tensor(np.transpose(img, (2,0,1)), dtype=torch.uint8))
+        # print(img.size())
         img = img.permute(1,2,0)
-        img = torch.tensor(np.transpose(cv2.cvtColor(np.array(img), cv2.COLOR_YUV2BGR), (2,0,1)), dtype=torch.uint8)
+        # print(img.size())
+        img = Image.fromarray(cv2.cvtColor(np.array(img), cv2.COLOR_YUV2BGR))
+        # print(img.size)
     elif op_name == "Samplesharing":
-        img = img*magnitude+img2*(1-magnitude)
+        img = np.asarray(img)
+        img2 = np.asarray(img2)
+        img = np.array(img*magnitude+img2*(1-magnitude), dtype=np.uint8)
+        img = Image.fromarray(img)
     else:
         raise ValueError("The provided operator {} is not recognized.".format(op_name))
     return img
@@ -214,18 +226,18 @@ class AutoAugment(torch.nn.Module):
             ]
         elif policy == AutoAugmentPolicy.LCA:
             return [
-                (("Samplesharing", 0.3, 4), ("Rotate", 0.3, None)),
-                (("Gaussian", 0.3, 8), ("Flip", 0.3, None)),
-                (("Solarize", 0.3, None), ("Cutout", 0.3, 6)),
-                (("Color", 0.3, None), ("ShearX", 0.3, None)),
-                (("Contrast", 0.3, None), ("ShearY", 0.3, 3)),
-                (("Brightness", 0.3, 4), ("Scale", 0.3, None)),
-                (("Sharpness", 0.3, 8), ("Rotate", 0.3, None)),
-                (("Colorshift", 0.3, 5), ("Scale", 0.3, 6)),
+                (("Samplesharing", 0.3, int(torch.randint(0,10,(1,)))), ("Rotate", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Gaussian", 0.3, int(torch.randint(0,10,(1,)))), ("Flip", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Solarize", 0.3, int(torch.randint(0,10,(1,)))), ("Cutout", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Color", 0.3, int(torch.randint(0,10,(1,)))), ("ShearX", 0.3, None)),
+                (("Contrast", 0.3, int(torch.randint(0,10,(1,)))), ("ShearY", 0.3, 3)),
+                (("Brightness", 0.3, int(torch.randint(0,10,(1,)))), ("Scale", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Sharpness", 0.3, int(torch.randint(0,10,(1,)))), ("Rotate", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Colorshift", 0.3, int(torch.randint(0,10,(1,)))), ("Scale", 0.3, int(torch.randint(0,10,(1,))))),
                 (("EqualizeYUV", 0.3, None), ("ShearX", 0.3, None)),
-                (("Posterize", 0.3, None), ("ShearY", 0.3, 3)),
-                (("AutoContrast", 0.3, 4), ("Flip", 0.3, 3)),
-                (("Equalize", 0.3, 8), ("Cutout", 0.3, None)),   
+                (("Posterize", 0.3, int(torch.randint(0,10,(1,)))), ("ShearY", 0.3, 3)),
+                (("AutoContrast", 0.3, int(torch.randint(0,10,(1,)))), ("Flip", 0.3, int(torch.randint(0,10,(1,))))),
+                (("Equalize", 0.3, None), ("Cutout", 0.3, int(torch.randint(0,10,(1,))))),  
             ]
         else:
             raise ValueError("The provided policy {} is not recognized.".format(policy))
@@ -233,13 +245,13 @@ class AutoAugment(torch.nn.Module):
     def _augmentation_space(self, num_bins: int, image_size: List[int]) -> Dict[str, Tuple[Tensor, bool]]:
         return {
             # op_name: (magnitudes, signed)
-            "Samplesharing": (torch.linspace(0.0, 0.4, num_bins), True),
-            "Gaussian": (torch.linspace(0.0, 0.4, num_bins), True),
-            "Flip": (torch.linspace(0.0), False),
-            "Cutout": (torch.linspace(0.0, 60.0, num_bins), True),
+            "Samplesharing": (torch.linspace(0.0, 0.4, num_bins), False),
+            "Gaussian": (torch.linspace(0.1, 0.4, num_bins), False),
+            "Flip": (torch.linspace(0.0, 0.0, num_bins), False),
+            "Cutout": (torch.linspace(0.0, 60.0, num_bins), False),
             "Colorshift": (torch.linspace(-20.0, 20.0, num_bins), True),
-            "Scale": (torch.linspace(0.6, 1.4, num_bins), True),
-            "EqualizeYUV": (torch.linspace(0.0), False),
+            "Scale": (torch.linspace(0.6, 1.4, num_bins), False),
+            "EqualizeYUV": (torch.linspace(0.0, 0.0, num_bins), False),
             
             "ShearX": (torch.linspace(-0.3, 0.3, num_bins), True),
             "ShearY": (torch.linspace(-0.3, 0.3, num_bins), True),
@@ -250,11 +262,11 @@ class AutoAugment(torch.nn.Module):
             "Color": (torch.linspace(0.1, 1.9, num_bins), True),
             "Contrast": (torch.linspace(0.1, 1.9, num_bins), True),
             "Sharpness": (torch.linspace(0.1, 1.9, num_bins), True),
-            "Posterize": (8 - (torch.arange(num_bins) / ((num_bins - 1) / 4)).round().int(), False), #### ????
+            "Posterize": (8 - (torch.arange(num_bins) / ((num_bins - 1) / 4)).round().int(), False), 
             "Solarize": (torch.linspace(1.0, 110.0, num_bins), False),
-            "AutoContrast": (torch.tensor(0.0), False),
-            "Equalize": (torch.tensor(0.0), False),
-            "Invert": (torch.tensor(0.0), False),
+            "AutoContrast": (torch.linspace(0.0, 0.0, num_bins), False),
+            "Equalize": (torch.linspace(0.0, 0.0, num_bins), False),
+            "Invert": (torch.linspace(0.0, 0.0, num_bins), False),
         }
 
     @staticmethod
@@ -295,11 +307,14 @@ class AutoAugment(torch.nn.Module):
 
         for i, (op_name, p, magnitude_id) in enumerate(self.policies[transform_id]):
             if probs[i] <= p:
+                # print(op_name)
                 op_meta = self._augmentation_space(10, F.get_image_size(img))
                 magnitudes, signed = op_meta[op_name]
+                # print(op_name, magnitudes, signed, magnitude_id)
                 magnitude = float(magnitudes[magnitude_id].item()) if magnitude_id is not None else 0.0
                 if signed and signs[i] == 0:
                     magnitude *= -1.0
+                # print(op_name, magnitude)
                 img = _apply_op(img, op_name, magnitude, interpolation=self.interpolation, fill=fill, img2=img2)
 
         return img

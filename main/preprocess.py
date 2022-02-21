@@ -5,12 +5,14 @@ import imutils
 import numpy as np
 import torch
 from torchvision.transforms import RandAugment, RandomCrop, CenterCrop
-
+from PIL import Image
 from AutoAugment.autoaugment import AutoAugment, AutoAugmentPolicy
 
 lowcost = AutoAugment(AutoAugmentPolicy.LCA)
 cropper = RandomCrop(size=(224, 224))
 center = CenterCrop(size=(224, 224))
+
+
 def _random_crop(image):
     r = random.randint(0, 3)
     c = random.randint(0, 4)
@@ -83,6 +85,7 @@ class preproc(object):
             image_t = (image/255.0).astype(np.float32)
         return image_t, labels
 
+
 class randaugment_preproc(object):
 
     def __init__(self):
@@ -98,7 +101,7 @@ class randaugment_preproc(object):
                     image_t = _center_crop(image)
                 else:
                     image_t = _random_crop(image)
-                    
+
             else:  # validate will go here!!!
                 image_t = _center_crop(image)
             image_t = (image_t/255.0).astype(np.float32)
@@ -107,7 +110,8 @@ class randaugment_preproc(object):
             image = _center_crop(image)
             image_t = (image/255.0).astype(np.float32)
         return image_t, labels
-    
+
+
 class lowcost_center_preproc(object):
 
     def __init__(self):
@@ -120,16 +124,18 @@ class lowcost_center_preproc(object):
             if phase == 'training':
                 image_t = lowcost(image, image2)
                 image_t = np.array(cropper(image_t), dtype=np.uint8)
-                    
+                # print(image_t.shape)
+
             else:  # validate will go here!!!
                 image_t = np.array(center(image), dtype=np.uint8)
+                # print(image_t.shape)
             image_t = (image_t/255.0).astype(np.float32)
         else:
             labels = [targets]
-            image = image_t = np.array(center(image), dtype=np.uint8)
-            image_t = (image/255.0).astype(np.float32)
+            image_t = np.array(center(image), dtype=np.uint8)
+            image_t = (image_t/255.0).astype(np.float32)
         return image_t, labels
-    
+
 
 class lowcost_16crop_preproc(object):
 
@@ -143,7 +149,7 @@ class lowcost_16crop_preproc(object):
             if phase == 'training':
                 image_t = lowcost(image, image2)
                 image_t = np.array(cropper(image_t), dtype=np.uint8)
-                    
+
             else:  # validate will go here!!!
                 # image_t = np.array(center(image), dtype=np.uint8)
                 pass

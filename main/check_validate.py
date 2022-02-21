@@ -3,22 +3,29 @@ import time
 from os.path import basename
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sn
+import timm
 import torch
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+
+# from ArcMarginModel import ArcMarginModel
 from dataset import dataloader
-from preprocess import preproc
-import seaborn as sn
-import pandas as pd
-import numpy as np
-import timm
+from preprocess import preproc, lowcost_center_preproc
+
+import warnings
+from torch.serialization import SourceChangeWarning
+warnings.filterwarnings("ignore", category=SourceChangeWarning)
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # data and model paths
 # validate_csv = '../../data/ISIC2018_Task3_Training_GroundTruth/ISIC2018_Task3_Training_GroundTruth.csv'
-validate_csv = './main/val.csv'
+validate_csv = './main/train.csv'
 data = '../../data/ISIC2018_Task3_Training_Input'
 
 models = os.listdir('./weights_test')
@@ -27,7 +34,7 @@ scores = models
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 # dataloader
-validation = dataloader(validate_csv, data, preproc(), 'validate')
+validation = dataloader(validate_csv, data, lowcost_center_preproc(), 'validate')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -42,7 +49,7 @@ def _confusion_matrix(model_name, score, y_true, y_pred):
     sns_plot = sn.heatmap(df_cm, annot=True, square=True, cmap="YlGnBu").set_title(f'Score: {score}')
     fig = sns_plot.get_figure()
     # fig.savefig(f"./confusion_matrix/full_data/{model_name}.png", dpi=400)
-    fig.savefig(f"./confusion_matrix/{model_name}.png", dpi=400)
+    fig.savefig(f"./confusion_matrix/{model_name}_train.png", dpi=400)
 
 def check(model, model_name, score, batch_size):
 

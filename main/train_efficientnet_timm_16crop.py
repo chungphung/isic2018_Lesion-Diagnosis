@@ -25,7 +25,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 training_csv = './main/train.csv'
 validate_csv = './main/val.csv'
-data = './data/ISIC2018_Task3_Training_Input'
+data = '../../data/ISIC2018_Task3_Training_Input'
 labels_names = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
 
 training = dataloader(training_csv, data, lowcost_16crop_preproc(), 'training')
@@ -38,9 +38,9 @@ dataloaders = {'train': training, 'val': validation}
 
 def _16_equal_crop(image):
     image_list = []
-    for i in range(15):
-        for j in range(15):
-            
+    for i in range(15): #23.5
+        for j in range(15): #14.125
+            pass
     return
 
 
@@ -83,7 +83,7 @@ def train_model(model, criterion, optimizer, scheduler, writer, model_name, batc
                 model.train()  # Set model to training mode
                 # Iterate over data.
                 batch_iterator = iter(DataLoader(
-                    dataloaders[phase], batch_size, shuffle=True, num_workers=20))
+                    dataloaders[phase], 5, shuffle=True, num_workers=4))
                 
                 # balanced_batch_sampler = BalancedBatchSampler(
                 #     training, training_csv, 7, batch_size)
